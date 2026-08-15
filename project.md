@@ -386,7 +386,7 @@ Delete = `status = 'archived'`, so past plans keep their reference.
 **Done when**: a batch of gathered URLs has been run through import and
 reviewed into ~10 real, searchable, correctly-parsed recipes.
 
-### Phase 2 — Week planner
+### Phase 2 — Week planner ✅ built, not yet deployed
 
 - Main page: Mon–Fri boxes for the current week (`plan_date` derived from
   today's ISO week), with prev/next week navigation.

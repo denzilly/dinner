@@ -45,6 +45,80 @@ def plan_days_between(start: date, end: date) -> dict[str, sqlite3.Row]:
     return {row["plan_date"]: row for row in rows}
 
 
+def plan_day(plan_date: date) -> sqlite3.Row | None:
+    return get_db().execute(
+        "SELECT * FROM plan_days WHERE plan_date = ?", (plan_date.isoformat(),)
+    ).fetchone()
+
+
+def set_plan_day(
+    plan_date: date,
+    *,
+    state: str,
+    recipe_id: int | None = None,
+    servings: int | None = None,
+    locked: bool | None = None,
+    note: str | None = None,
+) -> None:
+    """Upsert one day of the plan.
+
+    `locked` and `note` are None-means-unchanged so callers that only set a
+    recipe don't silently clear a lock someone set earlier.
+    """
+    conn = get_db()
+    existing = plan_day(plan_date)
+    previous_recipe = existing["recipe_id"] if existing else None
+
+    if locked is None:
+        locked = bool(existing["locked"]) if existing else False
+    if note is None and existing:
+        note = existing["note"]
+
+    conn.execute(
+        """INSERT INTO plan_days (plan_date, state, recipe_id, servings, locked, note)
+           VALUES (?,?,?,?,?,?)
+           ON CONFLICT(plan_date) DO UPDATE SET
+               state=excluded.state, recipe_id=excluded.recipe_id,
+               servings=excluded.servings, locked=excluded.locked, note=excluded.note""",
+        (plan_date.isoformat(), state, recipe_id, servings, 1 if locked else 0, note),
+    )
+    conn.commit()
+
+    # Both the recipe leaving the day and the one arriving need recomputing.
+    for affected in {previous_recipe, recipe_id} - {None}:
+        recompute_last_planned(affected)
+
+
+def recompute_last_planned(recipe_id: int) -> None:
+    """Derive last_planned_on from the plan rather than tracking it by hand.
+
+    Recomputing means removing a recipe from a day, or planning one in the
+    past, both land on the right answer -- an incrementally maintained field
+    would drift the first time something was un-planned.
+    """
+    conn = get_db()
+    conn.execute(
+        """UPDATE recipes
+              SET last_planned_on = (
+                  SELECT MAX(plan_date) FROM plan_days
+                   WHERE recipe_id = ? AND state = 'planned')
+            WHERE id = ?""",
+        (recipe_id, recipe_id),
+    )
+    conn.commit()
+
+
+def recipe_ids_in_week(start: date, end: date) -> set[int]:
+    return {
+        row["recipe_id"]
+        for row in get_db().execute(
+            """SELECT recipe_id FROM plan_days
+                WHERE plan_date BETWEEN ? AND ? AND recipe_id IS NOT NULL""",
+            (start.isoformat(), end.isoformat()),
+        )
+    }
+
+
 def recipe_count(status: str = "active") -> int:
     row = get_db().execute(
         "SELECT COUNT(*) AS n FROM recipes WHERE status = ?", (status,)

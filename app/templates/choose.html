@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}Choose for {{ weekday }} — Dinner{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <h1>{{ weekday }} {{ plan_date.strftime('%d %B') }}</h1>
+  <a class="button" href="{{ url_for('plan.week', week=plan_date.isoformat()) }}">Back to the week</a>
+</div>
+
+<form class="filters" method="get" action="{{ url_for('plan.choose', day=plan_date.isoformat()) }}">
+  <div class="filters__row">
+    <input type="search" name="q" value="{{ filters.query }}" placeholder="Search recipes…"
+           aria-label="Search recipes">
+    <label>Max
+      <input type="number" name="max_minutes" min="5" step="5"
+             value="{{ filters.max_minutes or '' }}" class="input-tiny"> min
+    </label>
+    <button type="submit">Filter</button>
+    {% if filters.active %}
+      <a class="link-button" href="{{ url_for('plan.choose', day=plan_date.isoformat()) }}">Clear</a>
+    {% endif %}
+  </div>
+
+  {% for kind, tags in tags_by_kind.items() %}
+    <div class="filters__tags">
+      <span class="filters__kind">{{ kind }}</span>
+      {% for tag in tags %}
+        <label class="chip {{ 'chip--on' if tag.id in filters.tag_ids }}">
+          <input type="checkbox" name="tag" value="{{ tag.id }}"
+                 {{ 'checked' if tag.id in filters.tag_ids }}>
+          {{ tag.name }} <span class="chip__count">{{ tag.uses }}</span>
+        </label>
+      {% endfor %}
+    </div>
+  {% endfor %}
+</form>
+
+{% if recipes %}
+  <form class="surprise" method="post"
+        action="{{ url_for('plan.random_day', day=plan_date.isoformat()) }}">
+    {# Carry the filters through, so "surprise me" respects what's on screen. #}
+    {% for name, value in filters.as_params() %}
+      <input type="hidden" name="{{ name }}" value="{{ value }}">
+    {% endfor %}
+    <button type="submit" class="button button--primary">
+      Surprise me{% if filters.active %} from these {{ recipes|length }}{% endif %}
+    </button>
+  </form>
+{% endif %}
+
+{% if not recipes %}
+  <p class="empty-state">
+    {% if filters.active %}Nothing matches those filters.{% else %}
+      The bank is empty. <a href="{{ url_for('recipes.review') }}">Import some recipes</a> first.
+    {% endif %}
+  </p>
+{% else %}
+  <p class="result-count">{{ recipes|length }} recipe{{ '' if recipes|length == 1 else 's' }}, least recently cooked first</p>
+  <ul class="choose-list">
+    {% for recipe in recipes %}
+      <li>
+        <form method="post" action="{{ url_for('plan.set_day', day=plan_date.isoformat()) }}">
+          <input type="hidden" name="recipe_id" value="{{ recipe.id }}">
+          <button type="submit" class="choose-list__pick">
+            <span class="recipe-list__title">{{ recipe.title }}</span>
+            <span class="recipe-list__meta">
+              {% set total = (recipe.prep_minutes or 0) + (recipe.cook_minutes or 0) %}
+              {% if total %}{{ total }} min · {% endif %}serves {{ recipe.servings }}
+              {% if recipe.id in already_planned %}
+                · <span class="warn-inline">already this week</span>
+              {% elif recipe.last_planned_on %}
+                · last cooked {{ recipe.last_planned_on }}
+              {% else %}
+                · never cooked
+              {% endif %}
+            </span>
+          </button>
+        </form>
+      </li>
+    {% endfor %}
+  </ul>
+{% endif %}
+{% endblock %}

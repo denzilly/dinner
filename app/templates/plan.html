@@ -14,6 +14,21 @@
   <a class="week-nav__step" href="{{ url_for('plan.week', week=next_week) }}" rel="next">Next &rarr;</a>
 </div>
 
+{% if recipe_count %}
+  <div class="week-actions">
+    {% if empty_days %}
+      <form method="post" action="{{ url_for('plan.fill_week', monday=monday.isoformat()) }}">
+        <button type="submit" class="button">Fill {{ empty_days }} empty day{{ '' if empty_days == 1 else 's' }}</button>
+      </form>
+    {% endif %}
+    {% if unlocked_count %}
+      <form method="post" action="{{ url_for('plan.reroll_week', monday=monday.isoformat()) }}">
+        <button type="submit" class="button">Reroll {{ unlocked_count }} unlocked</button>
+      </form>
+    {% endif %}
+  </div>
+{% endif %}
+
 <ol class="board">
   {% for day in board %}
     <li class="day {% if day.is_today %}day--today{% endif %} day--{{ day.state }}">
@@ -21,27 +36,74 @@
         <span class="day__weekday">{{ day.weekday }}</span>
         <span class="day__date">{{ day.date.strftime('%d/%m') }}</span>
       </div>
+
       <div class="day__body">
-        {% if day.state == 'planned' and day.recipe_title %}
-          <p class="day__recipe">{{ day.recipe_title }}</p>
+        {% if day.state == 'planned' and day.recipe_id %}
+          <a class="day__recipe" href="{{ url_for('recipes.detail', recipe_id=day.recipe_id) }}">
+            {{ day.recipe_title }}
+          </a>
+          {% set total = (day.prep_minutes or 0) + (day.cook_minutes or 0) %}
+          {% set stats = [] %}
+          {% if total %}{% set _ = stats.append(total ~ ' min') %}{% endif %}
+          {% if day.servings %}{% set _ = stats.append('serves ' ~ day.servings) %}{% endif %}
+          {% if stats %}<p class="day__stats">{{ stats|join(' · ') }}</p>{% endif %}
         {% elif day.state == 'skip' %}
           <p class="day__empty">Eating out</p>
         {% else %}
           <p class="day__empty">Nothing planned</p>
         {% endif %}
+
         {% if day.note %}<p class="day__note">{{ day.note }}</p>{% endif %}
       </div>
+
+      <div class="day__actions">
+        {% if day.state == 'planned' %}
+          <a class="day__action" href="{{ url_for('plan.choose', day=day.iso) }}">Change</a>
+          <form method="post" action="{{ url_for('plan.random_day', day=day.iso) }}">
+            <button type="submit" class="day__action">Reroll</button>
+          </form>
+          <form method="post" action="{{ url_for('plan.toggle_lock', day=day.iso) }}">
+            <button type="submit" class="day__action {{ 'is-on' if day.locked }}"
+                    title="{{ 'Locked — reroll skips this day' if day.locked else 'Lock against reroll' }}">
+              {{ '🔒' if day.locked else '🔓' }}
+            </button>
+          </form>
+          <form method="post" action="{{ url_for('plan.clear_day', day=day.iso) }}">
+            <button type="submit" class="day__action">Clear</button>
+          </form>
+        {% elif day.state == 'skip' %}
+          <form method="post" action="{{ url_for('plan.clear_day', day=day.iso) }}">
+            <button type="submit" class="day__action">Undo skip</button>
+          </form>
+        {% else %}
+          <a class="day__action" href="{{ url_for('plan.choose', day=day.iso) }}">Choose</a>
+          <form method="post" action="{{ url_for('plan.random_day', day=day.iso) }}">
+            <button type="submit" class="day__action">Random</button>
+          </form>
+          <form method="post" action="{{ url_for('plan.skip_day', day=day.iso) }}">
+            <button type="submit" class="day__action">Skip</button>
+          </form>
+        {% endif %}
+      </div>
+
+      <details class="day__details">
+        <summary>Servings &amp; note</summary>
+        <form method="post" action="{{ url_for('plan.update_details', day=day.iso) }}">
+          <label>Serves
+            <input type="number" name="servings" min="1" value="{{ day.servings or '' }}">
+          </label>
+          <input type="text" name="note" value="{{ day.note or '' }}" placeholder="eten bij mijn ouders">
+          <button type="submit" class="day__action">Save</button>
+        </form>
+      </details>
     </li>
   {% endfor %}
 </ol>
 
-<p class="scaffold-note">
-  {% if recipe_count == 0 %}
-    The recipe bank is empty. Adding, importing and choosing recipes arrive in
-    phases&nbsp;1 and&nbsp;2 — this page is the phase&nbsp;0 shell.
-  {% else %}
-    {{ recipe_count }} recipe{{ '' if recipe_count == 1 else 's' }} in the bank.
-    Choosing them per day arrives in phase&nbsp;2.
-  {% endif %}
-</p>
+{% if recipe_count == 0 %}
+  <p class="scaffold-note">
+    The recipe bank is empty — <a href="{{ url_for('recipes.review') }}">import some recipes</a>
+    before planning a week.
+  </p>
+{% endif %}
 {% endblock %}
