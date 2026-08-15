@@ -5,9 +5,10 @@ what's for dinner?
 Weekly meal planner: pick a recipe for each weekday, get one aggregated grocery
 list for the week. See [project.md](project.md) for the full plan.
 
-**Status**: phase 2 — recipe bank (URL import, review queue, search, tags) plus
-a working week planner (choose, random, skip, lock, fill, reroll). The grocery
-list (phase 3) is next.
+**Status**: phase 3 — the core app is complete. Recipe bank (URL import, review
+queue, search, tags), week planner (choose, random, skip, lock, fill, reroll)
+and an aggregated grocery list per week. Next up is hardening (phase 4), then
+the optional LLM suggestion feed and Picnic integration.
 
 ## Tests
 
@@ -74,6 +75,7 @@ forget.
 | `app/queries.py` | all SQL |
 | `app/weeks.py` | week arithmetic |
 | `app/planner.py` | filtered, staleness-weighted random picking |
+| `app/grocery.py` | unit aggregation and shopping-list rendering |
 | `app/parse.py` | ingredient lines → quantity/unit/name |
 | `app/extract.py` | URL → recipe (JSON-LD, microdata) + fetch guards |
 | `app/routes_*.py` | blueprints |

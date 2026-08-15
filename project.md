@@ -402,7 +402,7 @@ reviewed into ~10 real, searchable, correctly-parsed recipes.
 
 **Done when**: a full week can be planned in under a minute.
 
-### Phase 3 — Grocery list
+### Phase 3 — Grocery list ✅ built, not yet deployed
 
 A permanent, first-class feature — **not** a stopgap until Picnic. It is the
 fallback for every way phase 6 can break (Picnic ships an app update, 2FA

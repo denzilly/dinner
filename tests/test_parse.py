@@ -175,6 +175,43 @@ def test_quantity_display_round_trips():
         assert parse_line(f"{text} cup x").quantity == pytest.approx(original, abs=0.005)
 
 
+def test_parenthetical_before_the_unit_does_not_hide_it():
+    """'1 (2-ounce) can anchovies' must still find the can."""
+    parsed = parse_line("1 (2-ounce) can anchovy fillets, drained")
+    assert parsed.quantity == 1
+    assert parsed.unit == "can"
+    assert parsed.name == "anchovy fillets"
+    assert "2-ounce" in parsed.note and "drained" in parsed.note
+
+
+def test_dual_measure_prefers_the_weight():
+    """NYT writes '3 cups/8 ounces X'; cups of a solid are unshoppable."""
+    parsed = parse_line("3 cups/8 ounces sugar snap peas, trimmed")
+    assert parsed.quantity == 8
+    assert parsed.unit == "oz"
+    assert parsed.name == "sugar snap peas"
+    assert any("two measures" in w for w in parsed.warnings)
+
+
+def test_dual_measure_with_a_modifier_and_a_fraction():
+    parsed = parse_line("2 packed cups/1½ ounces basil leaves")
+    assert parsed.quantity == pytest.approx(1.5)
+    assert parsed.unit == "oz"
+    assert parsed.name == "basil leaves"
+
+
+def test_dual_measure_ignored_when_the_alternative_is_not_a_weight():
+    parsed = parse_line("2 cups/500 ml stock")
+    assert parsed.unit == "cup"
+    assert parsed.quantity == 2
+
+
+def test_slash_between_non_units_is_left_alone():
+    parsed = parse_line("2 tbsp salt/pepper mix")
+    assert parsed.unit == "tbsp"
+    assert parsed.name == "salt/pepper mix"
+
+
 def test_canonical_name_normalises_case_and_space():
     assert canonical_name("  Red   Onion ") == "red onion"
     # Descriptors are preserved deliberately -- merging is a human decision.

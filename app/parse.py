@@ -234,27 +234,63 @@ def _match_unit(words: list[str]) -> tuple[str | None, int, list[str]]:
     return None, 0, []
 
 
+def _extract_parentheticals(text: str) -> tuple[str, list[str]]:
+    """Pull "(2-ounce)" style asides out before anything else is parsed.
+
+    This has to happen *before* unit matching, not after: in "1 (2-ounce) can
+    anchovy fillets" the aside sits between the amount and the unit, so leaving
+    it in place hides the "can" and the line silently becomes a count of
+    nothing.
+    """
+    notes: list[str] = []
+
+    def take(match):
+        notes.append(match.group(1).strip())
+        return " "
+
+    return re.sub(r"\(([^)]*)\)", take, text), notes
+
+
+# NYT writes dual measures: "3 cups/8 ounces sugar snap peas". The volume half
+# is unshoppable for a solid; the weight half is exactly what a shop sells by.
+DUAL_MEASURE = re.compile(
+    r"\b([a-z]+)\s*/\s*([\d\s./¼½¾⅐⅑⅒⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]+)\s*([a-z]+)\b", re.I
+)
+
+
+def _prefer_mass_alternative(text: str) -> tuple[str, bool]:
+    """Collapse a dual measure like "3 cups/8 ounces X" down to one.
+
+    The weight half wins when there is one, since that is what a shop sells by.
+    Otherwise the first half is kept and the alternative dropped -- either way
+    the line has to end up with a single measure, because "cups/500" is not a
+    unit and leaving it in place loses the amount entirely.
+    """
+    match = DUAL_MEASURE.search(text)
+    if not match:
+        return text, False
+
+    first_unit = UNIT_ALIASES.get(match.group(1).lower())
+    second_unit = UNIT_ALIASES.get(match.group(3).lower())
+    if not first_unit or not second_unit:
+        return text, False
+
+    if UNITS[second_unit][0] == "mass":
+        # Drop everything before the measure too -- that leading amount belonged
+        # to the half being discarded.
+        return f"{match.group(2).strip()} {match.group(3)} {text[match.end():].strip()}", True
+
+    return f"{text[:match.start()]}{match.group(1)} {text[match.end():].strip()}", False
+
+
 def _split_note(text: str) -> tuple[str, str | None]:
     """Separate the ingredient from its preparation note.
 
     "red onion, halved and sliced" -> ("red onion", "halved and sliced")
-    "Kosher salt (Diamond Crystal)" -> ("Kosher salt", "Diamond Crystal")
     """
-    note_parts = []
-
-    def take_parenthetical(match):
-        note_parts.append(match.group(1).strip())
-        return " "
-
-    text = re.sub(r"\(([^)]*)\)", take_parenthetical, text)
-
     head, sep, tail = text.partition(",")
-    if sep and tail.strip():
-        note_parts.insert(0, tail.strip())
-        text = head
-
-    name = re.sub(r"\s+", " ", text).strip(" ,;")
-    note = "; ".join(part for part in note_parts if part) or None
+    note = tail.strip() if sep and tail.strip() else None
+    name = re.sub(r"\s+", " ", head).strip(" ,;")
     return name, note
 
 
@@ -273,6 +309,14 @@ def parse_line(line: str) -> ParsedIngredient:
     to_taste = bool(TO_TASTE.search(working))
     if to_taste:
         working = TO_TASTE.sub("", working)
+
+    # Before fractions become ASCII, since that introduces slashes of its own
+    # ("1½" -> "1 1/2") which would confuse the dual-measure pattern.
+    working, used_alternative = _prefer_mass_alternative(working)
+    if used_alternative:
+        warnings.append("recipe gave two measures; used the weight")
+
+    working, parentheticals = _extract_parentheticals(working)
 
     working = _fractions_to_ascii(working)
 
@@ -315,9 +359,11 @@ def parse_line(line: str) -> ParsedIngredient:
 
     name, note = _split_note(working)
 
-    if modifiers:
-        modifier_text = " ".join(modifiers).lower()
-        note = f"{modifier_text}; {note}" if note else modifier_text
+    extra_notes = [part for part in ([" ".join(modifiers).lower()] if modifiers else [])]
+    extra_notes += parentheticals
+    if note:
+        extra_notes.append(note)
+    note = "; ".join(part for part in extra_notes if part) or None
 
     if not name:
         warnings.append("no ingredient name found")

@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+
+{% block title %}Groceries — week of {{ monday.strftime('%d %B') }}{% endblock %}
+
+{% block content %}
+<div class="week-nav">
+  <a class="week-nav__step" href="{{ url_for('grocery.show', week=previous_week) }}" rel="prev">&larr; Previous</a>
+  <div class="week-nav__label">
+    <h1>Groceries — {{ monday.strftime('%d %B') }}</h1>
+    {% if not is_current_week %}
+      <a class="week-nav__today" href="{{ url_for('grocery.show') }}">Back to this week</a>
+    {% endif %}
+  </div>
+  <a class="week-nav__step" href="{{ url_for('grocery.show', week=next_week) }}" rel="next">Next &rarr;</a>
+</div>
+
+{% if not has_anything %}
+  <p class="empty-state">
+    Nothing planned for this week yet —
+    <a href="{{ url_for('plan.week', week=monday.isoformat()) }}">plan some days</a> first.
+  </p>
+{% else %}
+
+  {% if stale %}
+    <p class="flash flash--info">
+      The plan has changed since this list was last saved. Ticks are kept for
+      lines that haven't changed.
+    </p>
+  {% endif %}
+
+  <div class="week-actions">
+    <form method="post" action="{{ url_for('grocery.generate', monday=monday.isoformat()) }}">
+      <button type="submit" class="button">Rebuild from the plan</button>
+    </form>
+    <button type="button" class="button" id="copy-list">Copy as text</button>
+    <a class="button" href="{{ url_for('grocery.ingredients') }}">Aisles</a>
+  </div>
+
+  {% for aisle, lines in grouped %}
+    <section class="aisle">
+      <h2>{{ aisle }}</h2>
+      <ul class="grocery">
+        {% for line in lines %}
+          {% set item_id = item_id_for(line) %}
+          <li class="{{ 'is-checked' if checked_for(line) }}">
+            {% if item_id %}
+              <form method="post" action="{{ url_for('grocery.toggle', item_id=item_id) }}">
+                <input type="hidden" name="next"
+                       value="{{ url_for('grocery.show', week=monday.isoformat()) }}">
+                <button type="submit" class="tick" aria-label="Tick off">
+                  {{ '☑' if checked_for(line) else '☐' }}
+                </button>
+              </form>
+            {% else %}
+              <span class="tick tick--unsaved" title="Rebuild the list to tick this off">☐</span>
+            {% endif %}
+            <span class="grocery__amount">{{ line.amount }}</span>
+            <span class="grocery__name">{{ line.name }}</span>
+            {% if line.split %}
+              <span class="ing-note" title="Different kinds of unit — not combined">not combined</span>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endfor %}
+
+  {% if manual %}
+    <section class="aisle">
+      <h2>added by hand</h2>
+      <ul class="grocery">
+        {% for item in manual %}
+          <li class="{{ 'is-checked' if item.checked }}">
+            <form method="post" action="{{ url_for('grocery.toggle', item_id=item.id) }}">
+              <input type="hidden" name="next"
+                     value="{{ url_for('grocery.show', week=monday.isoformat()) }}">
+              <button type="submit" class="tick" aria-label="Tick off">
+                {{ '☑' if item.checked else '☐' }}
+              </button>
+            </form>
+            <span class="grocery__name">{{ item.label }}</span>
+            <form method="post" action="{{ url_for('grocery.delete', item_id=item.id) }}">
+              <input type="hidden" name="next"
+                     value="{{ url_for('grocery.show', week=monday.isoformat()) }}">
+              <button type="submit" class="link-button">remove</button>
+            </form>
+          </li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endif %}
+
+  <form class="add-item" method="post"
+        action="{{ url_for('grocery.add_manual', monday=monday.isoformat()) }}">
+    <input name="label" placeholder="koffie, wc-papier…" aria-label="Add an item">
+    <button type="submit">Add</button>
+  </form>
+
+  {% if staples %}
+    <section class="aisle staples">
+      <h2>check the cupboard</h2>
+      <p class="field-hint">
+        These appear in the recipes without an amount — salt, pepper, oil.
+        Listed once, not aggregated.
+      </p>
+      <p>{{ staples|map(attribute='name')|join(', ') }}</p>
+    </section>
+  {% endif %}
+
+  <details class="text-version">
+    <summary>Plain text</summary>
+    <pre id="list-text">{{ text_version }}</pre>
+  </details>
+
+  <script>
+    // Copy-to-clipboard is the phone workflow until Picnic exists, and the
+    // fallback for every way Picnic can break afterwards.
+    document.getElementById('copy-list').addEventListener('click', async (event) => {
+      const text = document.getElementById('list-text').textContent;
+      try {
+        await navigator.clipboard.writeText(text);
+        event.target.textContent = 'Copied';
+      } catch {
+        // Clipboard access needs a secure context; opening the block is the
+        // honest fallback rather than pretending it worked.
+        document.querySelector('.text-version').open = true;
+        event.target.textContent = 'Copy failed — select the text below';
+      }
+      setTimeout(() => { event.target.textContent = 'Copy as text'; }, 2500);
+    });
+  </script>
+{% endif %}
+{% endblock %}

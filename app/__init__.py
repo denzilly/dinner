@@ -60,12 +60,14 @@ def create_app() -> Flask:
 
     from app.routes_api import bp as api_bp
     from app.routes_auth import bp as auth_bp
+    from app.routes_grocery import bp as grocery_bp
     from app.routes_plan import bp as plan_bp
     from app.routes_recipes import bp as recipes_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(plan_bp)
     app.register_blueprint(recipes_bp)
+    app.register_blueprint(grocery_bp)
     app.register_blueprint(api_bp)
 
     @app.context_processor

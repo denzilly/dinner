@@ -257,6 +257,98 @@ main {
 
 .warn-inline { color: var(--accent); }
 
+/* Grocery list -- used one-handed in a shop, so rows are generous and the
+   tick target is large even at phone width. */
+
+.aisle { margin-bottom: 1.5rem; }
+
+.aisle h2 {
+  margin: 0 0 0.4rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.grocery { list-style: none; margin: 0; padding: 0; }
+
+.grocery li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.5rem 0.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.grocery li.is-checked { opacity: 0.45; }
+
+.grocery li.is-checked .grocery__name { text-decoration: line-through; }
+
+.grocery form { display: flex; }
+
+.tick {
+  padding: 0 0.2rem;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tick--unsaved { color: var(--border); cursor: default; }
+
+.grocery__amount {
+  min-width: 5.5rem;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.92rem;
+}
+
+.grocery__name { flex: 1; }
+
+.add-item { display: flex; gap: 0.5rem; margin: 1rem 0 2rem; }
+
+.add-item input { flex: 1; }
+
+.staples p { color: var(--muted); font-size: 0.9rem; }
+
+.text-version { margin-top: 2rem; }
+
+.text-version summary { color: var(--muted); font-size: 0.85rem; cursor: pointer; }
+
+.text-version pre {
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  overflow-x: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+}
+
+/* Aisle editor */
+
+.aisle-editor { list-style: none; margin: 1rem 0; padding: 0; }
+
+.aisle-editor li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.aisle-editor__name { flex: 1; }
+
+.aisle-editor select { min-width: 9rem; }
+
+@media (max-width: 520px) {
+  .grocery__amount { min-width: 4.5rem; }
+  .aisle-editor select { min-width: 7rem; }
+}
+
 .scaffold-note {
   margin-top: 1.5rem;
   color: var(--muted);

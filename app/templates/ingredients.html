@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Aisles — Dinner{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <h1>Ingredient aisles</h1>
+  <a class="button" href="{{ url_for('grocery.show') }}">Back to groceries</a>
+</div>
+
+<p class="field-hint">
+  Assigning aisles is what makes the grocery list walkable in shop order.
+  Anything left blank falls into “overig” at the end of the list.
+</p>
+
+<form method="post">
+  <div class="week-actions"><button type="submit" class="button button--primary">Save</button></div>
+
+  <ul class="aisle-editor">
+    {% for ingredient in ingredients %}
+      <li>
+        <span class="aisle-editor__name">{{ ingredient.name }}</span>
+        <span class="chip__count">{{ ingredient.uses }}</span>
+        <select name="aisle-{{ ingredient.id }}" aria-label="Aisle for {{ ingredient.name }}">
+          <option value="">—</option>
+          {% for aisle in aisles %}
+            <option value="{{ aisle }}" {{ 'selected' if ingredient.aisle == aisle }}>{{ aisle }}</option>
+          {% endfor %}
+        </select>
+      </li>
+    {% endfor %}
+  </ul>
+
+  <div class="week-actions"><button type="submit" class="button button--primary">Save</button></div>
+</form>
+{% endblock %}

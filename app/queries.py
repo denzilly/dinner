@@ -11,7 +11,7 @@ from datetime import date, datetime, timezone
 from flask import g
 
 import db
-from app import parse
+from app import grocery, parse
 
 
 def get_db() -> sqlite3.Connection:
@@ -154,29 +154,34 @@ def upsert_ingredient(name: str) -> int:
     if row:
         return row["id"]
 
-    stem = _stem(canonical)
+    stems = _stems(canonical)
     for existing in conn.execute("SELECT id, name FROM ingredients"):
-        if _stem(existing["name"]) == stem:
+        if _stems(existing["name"]) & stems:
             return existing["id"]
 
     return conn.execute("INSERT INTO ingredients (name) VALUES (?)", (canonical,)).lastrowid
 
 
-def _stem(name: str) -> str:
-    """Strip a common plural ending so singular and plural share a key.
+def _stems(name: str) -> set[str]:
+    """Every plausible singular form of `name`, matched by intersection.
 
-    Only applied to words long enough that the result is still meaningful, to
-    avoid mangling short names ("ei" must not become "e").
+    A set rather than one stem, because the rules overlap: "cloves" ends in
+    "es", so a first-match-wins stemmer strips it to "clov" and never meets
+    "clove". Generating both and intersecting means either spelling finds the
+    other regardless of which was stored first.
+
+    Kept to endings long enough to stay meaningful, so "ei" never becomes "e".
     """
+    candidates = {name}
     if len(name) > 4 and name.endswith("ies"):
-        return name[:-3] + "y"          # berries -> berry
+        candidates.add(name[:-3] + "y")     # berries -> berry
     if len(name) > 4 and name.endswith("es"):
-        return name[:-2]                # tomatoes -> tomato
+        candidates.add(name[:-2])           # tomatoes -> tomato
     if len(name) > 3 and name.endswith("en"):
-        return name[:-2]                # uien -> ui
+        candidates.add(name[:-2])           # uien -> ui
     if len(name) > 3 and name.endswith("s"):
-        return name[:-1]                # onions -> onion
-    return name
+        candidates.add(name[:-1])           # cloves -> clove
+    return candidates
 
 
 # --------------------------------------------------------------------------
@@ -330,6 +335,140 @@ def suggestion_count() -> int:
     return get_db().execute(
         "SELECT COUNT(*) AS n FROM recipes WHERE status = 'suggested'"
     ).fetchone()["n"]
+
+
+# --------------------------------------------------------------------------
+# Grocery lists
+# --------------------------------------------------------------------------
+
+def week_ingredients(start: date, end: date) -> list[dict]:
+    """Every ingredient the planned days of this week need, already scaled.
+
+    Skipped and empty days contribute nothing. The scale factor uses the day's
+    servings override when one is set, falling back to what the recipe assumes.
+    """
+    rows = get_db().execute(
+        """SELECT ri.ingredient_id, i.name, i.aisle, ri.quantity, ri.unit, ri.optional,
+                  p.servings AS day_servings, r.servings AS recipe_servings
+             FROM plan_days p
+             JOIN recipes r ON r.id = p.recipe_id
+             JOIN recipe_ingredients ri ON ri.recipe_id = r.id
+             JOIN ingredients i ON i.id = ri.ingredient_id
+            WHERE p.plan_date BETWEEN ? AND ? AND p.state = 'planned'""",
+        (start.isoformat(), end.isoformat()),
+    ).fetchall()
+
+    return [
+        {
+            "ingredient_id": row["ingredient_id"],
+            "name": row["name"],
+            "aisle": row["aisle"],
+            "quantity": row["quantity"],
+            "unit": row["unit"],
+            "scale": grocery.scale_factor(
+                row["recipe_servings"], row["day_servings"] or row["recipe_servings"]
+            ),
+        }
+        for row in rows
+    ]
+
+
+def get_or_create_list(week_start: date) -> sqlite3.Row:
+    conn = get_db()
+    row = conn.execute(
+        "SELECT * FROM grocery_lists WHERE week_start = ?", (week_start.isoformat(),)
+    ).fetchone()
+    if row:
+        return row
+    conn.execute(
+        "INSERT INTO grocery_lists (week_start, generated_at) VALUES (?, ?)",
+        (week_start.isoformat(), datetime.now(timezone.utc).isoformat(timespec="seconds")),
+    )
+    conn.commit()
+    return conn.execute(
+        "SELECT * FROM grocery_lists WHERE week_start = ?", (week_start.isoformat(),)
+    ).fetchone()
+
+
+def grocery_items(list_id: int, manual: bool | None = None) -> list[sqlite3.Row]:
+    sql = "SELECT * FROM grocery_items WHERE list_id = ?"
+    params: list = [list_id]
+    if manual is not None:
+        sql += " AND manual = ?"
+        params.append(1 if manual else 0)
+    return get_db().execute(sql + " ORDER BY id", params).fetchall()
+
+
+def replace_generated_items(list_id: int, lines) -> None:
+    """Rewrite the recipe-derived rows, keeping what the shopper has done.
+
+    A ticked box survives regeneration only when its line is unchanged: if the
+    amount moved from 400 g to 600 g, the item genuinely needs buying again and
+    silently keeping the tick would send you home short.
+    """
+    conn = get_db()
+    previous = {
+        row["label"]: row["checked"]
+        for row in conn.execute(
+            "SELECT label, checked FROM grocery_items WHERE list_id = ? AND manual = 0",
+            (list_id,),
+        )
+    }
+
+    conn.execute("DELETE FROM grocery_items WHERE list_id = ? AND manual = 0", (list_id,))
+    for line in lines:
+        conn.execute(
+            """INSERT INTO grocery_items (list_id, ingredient_id, label, unit, checked, manual)
+               VALUES (?,?,?,?,?,0)""",
+            (list_id, line.ingredient_id, line.label,
+             "staple" if line.staple else None, previous.get(line.label, 0)),
+        )
+    conn.execute(
+        "UPDATE grocery_lists SET generated_at = ? WHERE id = ?",
+        (datetime.now(timezone.utc).isoformat(timespec="seconds"), list_id),
+    )
+    conn.commit()
+
+
+def add_manual_item(list_id: int, label: str) -> None:
+    conn = get_db()
+    conn.execute(
+        "INSERT INTO grocery_items (list_id, label, checked, manual) VALUES (?,?,0,1)",
+        (list_id, label),
+    )
+    conn.commit()
+
+
+def toggle_item(item_id: int) -> None:
+    conn = get_db()
+    conn.execute(
+        "UPDATE grocery_items SET checked = 1 - checked WHERE id = ?", (item_id,)
+    )
+    conn.commit()
+
+
+def delete_item(item_id: int) -> None:
+    conn = get_db()
+    conn.execute("DELETE FROM grocery_items WHERE id = ?", (item_id,))
+    conn.commit()
+
+
+def all_ingredients() -> list[sqlite3.Row]:
+    return get_db().execute(
+        """SELECT i.id, i.name, i.aisle, COUNT(ri.recipe_id) AS uses
+             FROM ingredients i
+             LEFT JOIN recipe_ingredients ri ON ri.ingredient_id = i.id
+            GROUP BY i.id
+            ORDER BY i.aisle IS NULL, i.aisle, i.name COLLATE NOCASE"""
+    ).fetchall()
+
+
+def set_ingredient_aisle(ingredient_id: int, aisle: str | None) -> None:
+    conn = get_db()
+    conn.execute(
+        "UPDATE ingredients SET aisle = ? WHERE id = ?", (aisle or None, ingredient_id)
+    )
+    conn.commit()
 
 
 def _fts_query(text: str) -> str:

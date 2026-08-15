@@ -321,3 +321,23 @@ def test_singular_first_also_folds(client, app):
 
     with app.app_context():
         assert queries.ingredient_names() == ["ui"]
+
+
+def test_words_ending_in_es_still_fold(client, app):
+    """'cloves' strips to 'clov' under a first-match-wins stemmer, which never
+    meets 'clove' -- the exact case that split garlic across two rows."""
+    client.post("/recipes/new", data={
+        "title": "D", "ingredients": "2 garlic cloves\n1 garlic clove", "servings": "4",
+    }, follow_redirects=True)
+
+    with app.app_context():
+        assert queries.ingredient_names() == ["garlic cloves"]
+
+
+def test_unrelated_ingredients_are_not_merged(client, app):
+    client.post("/recipes/new", data={
+        "title": "E", "ingredients": "1 ui\n1 ei\n200 g kaas\n2 appels", "servings": "4",
+    }, follow_redirects=True)
+
+    with app.app_context():
+        assert sorted(queries.ingredient_names()) == ["appels", "ei", "kaas", "ui"]
