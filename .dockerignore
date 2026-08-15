@@ -1,0 +1,13 @@
+.git
+.gitignore
+.gitattributes
+.env
+data/
+*.db
+__pycache__/
+*.pyc
+.venv/
+venv/
+plan.md.txt
+project.md
+README.md

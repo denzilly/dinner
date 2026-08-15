@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}{{ recipe.title }} — Dinner{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <h1>{{ recipe.title }}</h1>
+  <a class="button" href="{{ url_for('recipes.edit', recipe_id=recipe.id) }}">Edit</a>
+</div>
+
+<p class="card__meta">
+  serves {{ recipe.servings }}
+  {% if recipe.prep_minutes %} · {{ recipe.prep_minutes }} min prep{% endif %}
+  {% if recipe.cook_minutes %} · {{ recipe.cook_minutes }} min cooking{% endif %}
+  {% if recipe.source_url %}
+    · <a href="{{ recipe.source_url }}" target="_blank" rel="noopener noreferrer">
+        {{ recipe.source_name or 'original' }}</a>
+  {% endif %}
+</p>
+
+{% if tags %}
+  <p class="tag-row">
+    {% for tag in tags %}<span class="chip chip--static">{{ tag.name }}</span>{% endfor %}
+  </p>
+{% endif %}
+
+<div class="recipe-body">
+  <section>
+    <h2>Ingredients</h2>
+    <ul class="ingredients">
+      {% for ing in ingredients %}
+        <li>
+          {% if ing.quantity is not none %}
+            <span class="qty">{{ ing.quantity|amount }}{% if ing.unit and ing.unit != 'piece' %} {{ ing.unit }}{% endif %}</span>
+          {% else %}
+            <span class="qty qty--none">some</span>
+          {% endif %}
+          {{ ing.name }}
+          {% if ing.note %}<span class="ing-note">{{ ing.note }}</span>{% endif %}
+          {% if ing.optional %}<span class="ing-note">optional</span>{% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  {% if recipe.instructions %}
+    <section>
+      <h2>Method</h2>
+      {% for step in recipe.instructions.split('\n\n') %}
+        <p>{{ step }}</p>
+      {% endfor %}
+    </section>
+  {% endif %}
+</div>
+
+{% if recipe.notes %}
+  <section><h2>Notes</h2><p>{{ recipe.notes }}</p></section>
+{% endif %}
+
+<form method="post" action="{{ url_for('recipes.archive', recipe_id=recipe.id) }}"
+      class="archive-form">
+  <button type="submit" class="link-button">Archive this recipe</button>
+</form>
+{% endblock %}

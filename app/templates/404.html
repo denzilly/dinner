@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+
+{% block title %}Not found — Dinner{% endblock %}
+
+{% block content %}
+<div class="notice">
+  <h1>Not found</h1>
+  <p>No page here. <a href="{{ url_for('plan.week') }}">Back to this week</a>.</p>
+</div>
+{% endblock %}

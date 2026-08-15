@@ -1,0 +1,22 @@
+ We are going to create a new web application that will be used to do weekly meal planning. The application has two parts
+
+    a main page with the plan for the week (it should show 5 boxes for the current week, mon-fri)
+    A recipe bank, basically a collection of all stored recipes that can be added to the week planner
+
+
+The idea behind the application is that the user can choose a recipe for each day, and that at the end a groecery list is created for the whole week. Later on I want to look into integrating the picnic API so that we even create an automatic grocery list for the whole week.
+
+For each day block, a number of options are possible
+
+    SKIP (no recipe to be chosen for this day, maybe we are eating out, for example)
+    Select recipe Search from the databse for a particular recipe
+    Random Choose a recipe at random from the database
+    For the select recipe and random options, we should be able to apply filters—we are still brainstorming how to handle this properly, but I think a tag system would probably work best. We want to sort on cuisine, preptime, etc
+
+
+
+Recipe Database
+
+    The Database contains recipes that we can add manually (which we will do initially). This should be doable via the webapp
+    We also want to be able to add recipes to the database automatically, I think we want to do this via hermes agent. I'm going to setup a workflow where it learns how to add recipes
+    Finally, I want an LLM (probably deepseek) to run a weekly query checking certain websites for new recipes that we might be interested in. These recipes should be added to a suggested recipe feed on the website, after which we will decide whether or not to add them to the database. I guess this query will check a number of websites that we usually find good  

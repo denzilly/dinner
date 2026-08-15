@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Edit' if recipe else 'New recipe' }} — Dinner{% endblock %}
+
+{% block content %}
+<h1>{{ 'Edit recipe' if recipe else 'New recipe' }}</h1>
+
+<form class="recipe-form" method="post">
+  <label for="title">Title</label>
+  <input id="title" name="title" value="{{ recipe.title if recipe else '' }}" required>
+
+  <div class="recipe-form__row">
+    <label>Serves
+      <input type="number" name="servings" min="1"
+             value="{{ recipe.servings if recipe else 4 }}">
+    </label>
+    <label>Prep (min)
+      <input type="number" name="prep_minutes" min="0"
+             value="{{ recipe.prep_minutes if recipe and recipe.prep_minutes else '' }}">
+    </label>
+    <label>Cooking (min)
+      <input type="number" name="cook_minutes" min="0"
+             value="{{ recipe.cook_minutes if recipe and recipe.cook_minutes else '' }}">
+    </label>
+  </div>
+
+  <label for="ingredients">Ingredients — one per line</label>
+  <p class="field-hint">
+    Written the way a recipe writes them: <code>500 g gehakt</code>,
+    <code>2 uien, fijngesneden</code>, <code>1½ cups farro</code>,
+    <code>2 tablespoons capers (optional)</code>. Amounts and units are parsed out
+    automatically; anything ambiguous is kept as written and flagged.
+  </p>
+  <textarea id="ingredients" name="ingredients" rows="12" required>{{ ingredient_block }}</textarea>
+
+  <label for="instructions">Method</label>
+  <textarea id="instructions" name="instructions" rows="10">{{ recipe.instructions if recipe and recipe.instructions else '' }}</textarea>
+
+  <label for="source_url">Source URL</label>
+  <input id="source_url" name="source_url" type="url"
+         value="{{ recipe.source_url if recipe and recipe.source_url else '' }}">
+
+  <label for="notes">Notes</label>
+  <textarea id="notes" name="notes" rows="2">{{ recipe.notes if recipe and recipe.notes else '' }}</textarea>
+
+  {% if tags_by_kind %}
+    <span class="label-like">Tags</span>
+    {% for kind, tags in tags_by_kind.items() %}
+      <div class="filters__tags">
+        <span class="filters__kind">{{ kind }}</span>
+        {% for tag in tags %}
+          <label class="chip {{ 'chip--on' if tag.id in selected_tags }}">
+            <input type="checkbox" name="tag_id" value="{{ tag.id }}"
+                   {{ 'checked' if tag.id in selected_tags }}> {{ tag.name }}
+          </label>
+        {% endfor %}
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <div class="card__actions">
+    <button type="submit" class="button button--primary">Save</button>
+    <a class="button" href="{{ url_for('recipes.index') }}">Cancel</a>
+  </div>
+</form>
+
+<form class="new-tag" method="post" action="{{ url_for('recipes.create_tag') }}">
+  <label for="tag-name">New tag</label>
+  <input id="tag-name" name="name" placeholder="italiaans">
+  <select name="kind" aria-label="Tag kind">
+    {% for kind in tag_kinds %}<option value="{{ kind }}">{{ kind }}</option>{% endfor %}
+  </select>
+  <button type="submit">Add tag</button>
+</form>
+{% endblock %}

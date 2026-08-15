@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Week of {{ monday.strftime('%d %B %Y') }} — Dinner{% endblock %}
+
+{% block content %}
+<div class="week-nav">
+  <a class="week-nav__step" href="{{ url_for('plan.week', week=previous_week) }}" rel="prev">&larr; Previous</a>
+  <div class="week-nav__label">
+    <h1>Week of {{ monday.strftime('%d %B') }}</h1>
+    {% if not is_current_week %}
+      <a class="week-nav__today" href="{{ url_for('plan.week') }}">Back to this week</a>
+    {% endif %}
+  </div>
+  <a class="week-nav__step" href="{{ url_for('plan.week', week=next_week) }}" rel="next">Next &rarr;</a>
+</div>
+
+<ol class="board">
+  {% for day in board %}
+    <li class="day {% if day.is_today %}day--today{% endif %} day--{{ day.state }}">
+      <div class="day__header">
+        <span class="day__weekday">{{ day.weekday }}</span>
+        <span class="day__date">{{ day.date.strftime('%d/%m') }}</span>
+      </div>
+      <div class="day__body">
+        {% if day.state == 'planned' and day.recipe_title %}
+          <p class="day__recipe">{{ day.recipe_title }}</p>
+        {% elif day.state == 'skip' %}
+          <p class="day__empty">Eating out</p>
+        {% else %}
+          <p class="day__empty">Nothing planned</p>
+        {% endif %}
+        {% if day.note %}<p class="day__note">{{ day.note }}</p>{% endif %}
+      </div>
+    </li>
+  {% endfor %}
+</ol>
+
+<p class="scaffold-note">
+  {% if recipe_count == 0 %}
+    The recipe bank is empty. Adding, importing and choosing recipes arrive in
+    phases&nbsp;1 and&nbsp;2 — this page is the phase&nbsp;0 shell.
+  {% else %}
+    {{ recipe_count }} recipe{{ '' if recipe_count == 1 else 's' }} in the bank.
+    Choosing them per day arrives in phase&nbsp;2.
+  {% endif %}
+</p>
+{% endblock %}

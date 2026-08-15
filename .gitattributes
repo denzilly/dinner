@@ -1,0 +1,7 @@
+# Developed on Windows, runs on Linux in Docker. Normalise to LF in the repo so
+# a CRLF shebang never reaches the server -- that surfaces as Docker's cryptic
+# "exec: no such file or directory".
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.webp binary

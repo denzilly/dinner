@@ -1,0 +1,22 @@
+services:
+  dinner:
+    build: .
+    container_name: dinner
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+    # Loopback-only publish, so the Hermes gateway (network_mode: host, and so
+    # unable to resolve container names on the web network) can POST to the
+    # ingest endpoint at http://127.0.0.1:8001/api/recipes/ingest. Binding to
+    # 127.0.0.1 rather than 0.0.0.0 keeps it unreachable from outside the host;
+    # Caddy still serves the public side over the web network by container name.
+    ports:
+      - "127.0.0.1:8001:8000"
+    networks:
+      - web
+
+networks:
+  web:
+    external: true

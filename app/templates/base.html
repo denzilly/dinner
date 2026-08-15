@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Dinner{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="{{ url_for('plan.week') }}">Dinner</a>
+    <nav class="site-nav">
+      <a href="{{ url_for('plan.week') }}">Week</a>
+      <a href="{{ url_for('recipes.index') }}">Recipes</a>
+      <a href="{{ url_for('recipes.review') }}">
+        Review
+        {% set pending = pending_reviews() %}
+        {% if pending %}<span class="badge">{{ pending }}</span>{% endif %}
+      </a>
+    </nav>
+    {% if password_gate_enabled and session.get('authenticated') %}
+      <form method="post" action="{{ url_for('auth.logout') }}">
+        <button type="submit" class="link-button">Log out</button>
+      </form>
+    {% endif %}
+  </header>
+
+  <main>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <ul class="flashes">
+          {% for category, message in messages %}
+            <li class="flash flash--{{ category }}">{{ message }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}Review — Dinner{% endblock %}
+
+{% block content %}
+<h1>Review queue</h1>
+
+<form class="import" method="post" action="{{ url_for('recipes.import_urls') }}">
+  <label for="urls">Add from URL — one per line</label>
+  <textarea id="urls" name="urls" rows="3"
+            placeholder="https://cooking.nytimes.com/recipes/..."></textarea>
+  <button type="submit">Import</button>
+</form>
+
+{% if not suggestions %}
+  <p class="empty-state">
+    Nothing waiting. Paste some URLs above, or
+    <a href="{{ url_for('recipes.edit') }}">add a recipe by hand</a>.
+  </p>
+{% endif %}
+
+{% for item in suggestions %}
+  {% set recipe = item.row %}
+  <article class="card" id="recipe-{{ recipe.id }}">
+    <form method="post" action="{{ url_for('recipes.accept', recipe_id=recipe.id) }}">
+      <div class="card__head">
+        <input class="card__title" name="title" value="{{ recipe.title }}" aria-label="Title">
+        <span class="pill pill--{{ recipe.extraction }}">{{ recipe.extraction }}</span>
+      </div>
+
+      <p class="card__meta">
+        {% if recipe.source_name %}{{ recipe.source_name }}{% endif %}
+        {% if recipe.source_url %}
+          · <a href="{{ recipe.source_url }}" target="_blank" rel="noopener noreferrer">original</a>
+        {% endif %}
+        · <label>serves
+            <input type="number" name="servings" min="1" value="{{ recipe.servings or '' }}"
+                   class="input-tiny">
+          </label>
+        {% if recipe.prep_minutes or recipe.cook_minutes %}
+          · {{ (recipe.prep_minutes or 0) + (recipe.cook_minutes or 0) }} min
+        {% endif %}
+      </p>
+
+      {% if item.warning_count %}
+        <p class="warnings">
+          {{ item.warning_count }} line{{ '' if item.warning_count == 1 else 's' }} to check —
+          marked below.
+          {% for warning in item.recipe_warnings %}<br>{{ warning }}{% endfor %}
+        </p>
+      {% endif %}
+
+      <ul class="ingredients">
+        {% for ing in item.ingredients %}
+          <li>
+            {% if ing.quantity is not none %}
+              <span class="qty">{{ ing.quantity|amount }}{% if ing.unit and ing.unit != 'piece' %} {{ ing.unit }}{% endif %}</span>
+            {% else %}
+              <span class="qty qty--none">some</span>
+            {% endif %}
+            {{ ing.name }}
+            {% if ing.note %}<span class="ing-note">{{ ing.note }}</span>{% endif %}
+            {% if ing.optional %}<span class="ing-note">optional</span>{% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+
+      {% if item.suggested_tags %}
+        <fieldset class="tag-picker">
+          <legend>Tags found on the page — pick the useful ones</legend>
+          {% for tag in item.suggested_tags %}
+            <label class="chip">
+              <input type="checkbox" name="new_tag" value="{{ tag }}"> {{ tag }}
+            </label>
+          {% endfor %}
+          <select name="tag_kind" aria-label="Tag kind">
+            <option value="cuisine">as cuisine</option>
+            <option value="free" selected>as free tag</option>
+            <option value="diet">as diet</option>
+            <option value="protein">as protein</option>
+          </select>
+        </fieldset>
+      {% endif %}
+
+      <div class="card__actions">
+        <button type="submit" class="button button--primary">Accept</button>
+        <a class="button" href="{{ url_for('recipes.edit', recipe_id=recipe.id) }}">Edit first</a>
+      </div>
+    </form>
+
+    <form method="post" action="{{ url_for('recipes.reject', recipe_id=recipe.id) }}"
+          class="card__reject">
+      <button type="submit" class="link-button">Reject</button>
+    </form>
+  </article>
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,6 @@
+# Pinned so the server build matches what was developed against.
+Flask==3.1.0
+gunicorn==23.0.0
+python-dotenv==1.0.1
+requests==2.32.3
+beautifulsoup4==4.12.3

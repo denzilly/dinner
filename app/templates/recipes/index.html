@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}Recipes — Dinner{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <h1>Recipes</h1>
+  <a class="button button--primary" href="{{ url_for('recipes.edit') }}">Add by hand</a>
+</div>
+
+<form class="filters" method="get" action="{{ url_for('recipes.index') }}">
+  <div class="filters__row">
+    <input type="search" name="q" value="{{ query }}" placeholder="Search recipes…"
+           aria-label="Search recipes">
+    <label>Max
+      <input type="number" name="max_minutes" min="5" step="5" value="{{ max_minutes or '' }}"
+             class="input-tiny"> min
+    </label>
+    <select name="sort" aria-label="Sort by">
+      <option value="title" {{ 'selected' if sort == 'title' }}>A–Z</option>
+      <option value="recent" {{ 'selected' if sort == 'recent' }}>Recently added</option>
+      <option value="unused" {{ 'selected' if sort == 'unused' }}>Least recently cooked</option>
+      <option value="time" {{ 'selected' if sort == 'time' }}>Quickest first</option>
+    </select>
+    <button type="submit">Filter</button>
+    {% if query or active_tags or max_minutes %}
+      <a class="link-button" href="{{ url_for('recipes.index') }}">Clear</a>
+    {% endif %}
+  </div>
+
+  {% for kind, tags in tags_by_kind.items() %}
+    <div class="filters__tags">
+      <span class="filters__kind">{{ kind }}</span>
+      {% for tag in tags %}
+        <label class="chip {{ 'chip--on' if tag.id in active_tags }}">
+          <input type="checkbox" name="tag" value="{{ tag.id }}"
+                 {{ 'checked' if tag.id in active_tags }}>
+          {{ tag.name }} <span class="chip__count">{{ tag.uses }}</span>
+        </label>
+      {% endfor %}
+    </div>
+  {% endfor %}
+</form>
+
+{% if not recipes %}
+  <p class="empty-state">
+    {% if query or active_tags or max_minutes %}
+      Nothing matches those filters.
+    {% else %}
+      The bank is empty. <a href="{{ url_for('recipes.review') }}">Import some recipes</a>
+      or <a href="{{ url_for('recipes.edit') }}">add one by hand</a>.
+    {% endif %}
+  </p>
+{% else %}
+  <p class="result-count">{{ recipes|length }} recipe{{ '' if recipes|length == 1 else 's' }}</p>
+  <ul class="recipe-list">
+    {% for recipe in recipes %}
+      <li>
+        <a href="{{ url_for('recipes.detail', recipe_id=recipe.id) }}">
+          <span class="recipe-list__title">{{ recipe.title }}</span>
+          <span class="recipe-list__meta">
+            {% set total = (recipe.prep_minutes or 0) + (recipe.cook_minutes or 0) %}
+            {% if total %}{{ total }} min · {% endif %}
+            serves {{ recipe.servings }}
+            {% if recipe.source_name %} · {{ recipe.source_name }}{% endif %}
+          </span>
+        </a>
+      </li>
+    {% endfor %}
+  </ul>
+{% endif %}
+{% endblock %}
