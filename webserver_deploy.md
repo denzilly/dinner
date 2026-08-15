@@ -133,3 +133,57 @@ grocery line lands in "overig" and the aisle grouping does nothing.
   socket, which is why `research_aggregator` runs from OS cron.
 - **Phase 6 (Picnic)**: `python-picnic-api2` is the library to use. Scoped to
   building a cart, never placing an order.
+
+## Deployment record — 2026-08-15
+
+First deploy, done live on `bartserver`. Ran essentially as planned above —
+nothing here needed a real deviation from the plan, unlike
+`research_aggregator`'s Docker/cron/auth rewrites. Differences from the
+"Known risks" section worth recording:
+
+- **No uid 1000 collision.** `useradd --uid 1000 dinner` in `python:3.13-slim`
+  succeeded cleanly on the first build — the risk flagged above didn't
+  materialize on this image.
+- **`jamieoliver.com` TLS worked fine here.** The dev-machine certifi failure
+  didn't reproduce on this host/Python combination — all nine
+  `demo_recipes.txt` URLs, including the Jamie Oliver one, imported
+  successfully via `/recipes/import` with `jsonld` extraction. Worth
+  re-flagging if it starts failing later, but not a deploy blocker.
+- **`~/projects/dinner` was already present on the server** (cloned ahead of
+  time), so the `git clone` step was skipped — everything from `.env` onward
+  ran as documented.
+- **Secrets generated on-server** as instructed (`SECRET_KEY`, `SITE_PASSWORD`,
+  `INGEST_TOKEN`, all via `secrets.token_urlsafe`), none reused from dev.
+- **Cloudflare Tunnel route** was added by the user directly in the dashboard
+  (Zero Trust > Networks > Tunnels > Published application routes), same
+  manual step as every other service on this host — no API/CLI path existed
+  for it (`infra/.env` only holds `TUNNEL_TOKEN`, no API credential).
+
+### Verification checklist — actual results
+
+- [x] `docker compose ps` shows `dinner` healthy
+- [x] `curl -s localhost:8001/healthz` → `{"status":"ok"}`
+- [x] `https://dinner.btblog.dev` asks for the password; wrong password
+      rejected (200, no session granted), correct password grants a session
+      (subsequent loads 200), logout revokes it (subsequent loads redirect) —
+      confirmed both over loopback and the public domain
+- [x] Import works: pasted all nine `demo_recipes.txt` URLs into
+      `/recipes/review`'s box — 9/9 imported, `jsonld` extraction on all
+- [x] Accepted a recipe, planned it on a weekday (note: the board only shows
+      Mon–Fri by design — a plan set on a weekend date saves to the DB but
+      never renders on the board, confirmed via direct DB read; not a bug),
+      `/groceries` correctly aggregated its ingredients into "overig" (no
+      aisles assigned yet, as expected)
+- [x] `POST /api/recipes/ingest` with the bearer token → 201 with real
+      extraction data, not a login redirect; no/wrong token → 401 both times
+- [ ] **`data/dinner.db` backup coverage — still open.** Confirmed there is
+      no backup process anywhere on this host (empty crontab besides
+      `research_aggregator`'s ingestion job, nothing in `/etc/cron.d`,
+      `cron.daily`, or `cron.weekly`). This isn't dinner-specific — see
+      `infra/SERVICES.md`'s "Backups" section, now also listing
+      `dinner/data/dinner.db`. Setting up host-wide backups (even a simple
+      off-host `rsync`/`restic`) is worth doing once, not per-project.
+
+Row added to `infra/SERVICES.md`. Next real work is phase 4 (hardening) per
+`HANDOVER.md`: confirm backup coverage (blocked on the host-wide gap above)
+and add JSON export/import.
