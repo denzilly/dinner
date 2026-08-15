@@ -423,14 +423,25 @@ indefinitely on its own.
 
 **Done when**: one week's shopping is actually done off this list.
 
-### Phase 4 — Hardening
+### Phase 4 — Hardening (in progress, 2026-08-16)
 
-- `data/dinner.db` added to the server's backup sweep (still an unconfirmed
-  open item on `research_aggregator` — worth settling for both at once).
+- `data/dinner.db` added to the server's backup sweep — **still open**. There
+  is no backup process anywhere on `bartserver` yet (confirmed: empty
+  crontab besides `research_aggregator`'s ingestion job, nothing in
+  `/etc/cron.d`), so this stays a host-wide gap rather than something
+  dinner-specific to solve alone — see `infra/SERVICES.md`'s "Backups"
+  section. `backup.py` (below) is a usable manual stopgap in the meantime:
+  `python backup.py dump | ssh host 'cat > dinner-$(date +%F).json'`.
 - Seed/export: a JSON dump-and-load script, so the recipe bank isn't hostage
-  to one SQLite file.
+  to one SQLite file. **Built** — `backup.py` (`python backup.py dump|load`),
+  covers every table but the derived FTS index and migration bookkeeping.
+  `load` replaces wholesale rather than merging (see the module docstring for
+  why) and preserves row IDs so every foreign key still lines up. Round-trip
+  tested in `tests/test_backup.py`.
 - A basic smoke test over the aggregation math — unit conversion is the one
-  place a silent bug is both likely and expensive.
+  place a silent bug is both likely and expensive. **Already covered** —
+  `tests/test_grocery.py` had ~25 tests over exactly this before phase 4
+  started; nothing further was needed.
 
 ### Phase 5 — Weekly discovery sweep (later, to be specified)
 

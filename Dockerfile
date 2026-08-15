@@ -8,7 +8,7 @@ ENV PYTHONUNBUFFERED=1 \
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY config.py db.py run.py ./
+COPY config.py db.py run.py backup.py ./
 COPY db ./db
 COPY app ./app
 

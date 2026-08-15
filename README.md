@@ -70,6 +70,7 @@ forget.
 | `run.py` | dev entrypoint |
 | `config.py` | environment config |
 | `db.py` | connection helper + migration runner (`python db.py`) |
+| `backup.py` | JSON dump-and-load (`python backup.py dump\|load`) — see project.md phase 4 |
 | `db/migrations/` | versioned schema, applied in filename order |
 | `app/__init__.py` | app factory, password gate |
 | `app/queries.py` | all SQL |
