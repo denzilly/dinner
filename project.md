@@ -606,6 +606,111 @@ stored with it so quantities can be scaled without searching again.
 There is also a cheapest-vs-waste tradeoff no rule should silently pick:
 rundergehakt is €14.17/kg at 300 g, €11.10/kg at 500 g and €10.79/kg at 1 kg.
 
+#### Design, agreed 2026-08-16
+
+**A proposed cart, reviewed before it is pushed** — the same shape as the
+recipe review queue, for the same reason: nothing reaches a real basket that a
+human hasn't looked at.
+
+**What triggers a review is "not confirmed before", not "no exact match."**
+The obvious rule — auto-accept when the pack size matches — fails on the
+evidence above: a 200 ml olive oil *spray* is an exact match for 200 ml of
+olive oil and the wrong product. Size agreement says nothing about product
+identity, so the first time an ingredient appears it is always reviewed, however
+convincing the search looks. After that it is silent. Week one is heavy, week
+five is nearly empty, and the failure mode of asking too often is mild while
+the failure mode of guessing is a wrong item in the basket.
+
+**Two decisions with different lifetimes**, and conflating them is what would
+make the review recur forever:
+
+- *Which product* — stable. Confirmed once, remembered.
+- *How many packs* — recurring, recomputed weekly from the stored pack size,
+  never re-asked.
+
+##### Schema (migration `002_picnic.sql`)
+
+```sql
+CREATE TABLE IF NOT EXISTS picnic_products (
+    ingredient_id    INTEGER PRIMARY KEY REFERENCES ingredients (id) ON DELETE CASCADE,
+    decision         TEXT NOT NULL,   -- 'mapped' | 'never'
+    product_id       TEXT,            -- Picnic's "s1001382"
+    product_name     TEXT,            -- stored so a silent substitution is visible
+    pack_covers_qty  REAL,            -- how much of the ingredient ONE pack covers
+    pack_covers_unit TEXT,            -- ...in the recipe's units, not Picnic's
+    picnic_unit_text TEXT,            -- Picnic's raw "300 gram", kept for diagnosis
+    confirmed_at     TEXT NOT NULL,
+    CHECK (decision IN ('mapped', 'never')),
+    CHECK (decision = 'never'
+           OR (product_id IS NOT NULL AND pack_covers_qty > 0
+               AND pack_covers_unit IS NOT NULL))
+);
+```
+
+`pack_covers_qty`/`pack_covers_unit` are the load-bearing idea, and they are
+expressed in **the recipe's units rather than Picnic's**. That one field pair
+collapses all four matching shapes into a single calculation:
+
+| ingredient | one pack covers | so |
+|---|---|---|
+| `rundergehakt` | `500 g` | 750 g needed → 2 packs |
+| `uien` (3 stuks) | `3 piece` | 5 onions → 2 packs |
+| `losse ui` | `1 piece` | 5 onions → 5 packs |
+| `rookworst` | `1 piece` | 1 rookworst → 1 pack, despite Picnic selling it by weight |
+
+The `rookworst` row is the point: Picnic offers it only in grams (250–550 g)
+while the recipe counts sausages, and `parse.py`'s units are deliberately
+non-interchangeable across dimensions, so no code can bridge that. A human
+answers "one pack covers one rookworst" once at confirmation time, and the
+machine reuses it forever. **The human converts between dimensions; the
+machine only ever divides within one.**
+
+##### The proposed cart page
+
+A separate page (`/groceries/picnic`), not part of the grocery list itself —
+that page is used one-handed in a supermarket and product-picking would wreck
+it. Computed on demand from the week's grocery list; nothing is persisted
+except the mapping, exactly as the grocery list itself is derived rather than
+stored.
+
+Per line:
+
+- **unmapped** → show the top search hits with `unit_quantity`, price and
+  price per unit, so the cheapest-vs-waste tradeoff is visible and *chosen*
+  rather than ruled on. Confirming stores the mapping.
+- **mapped** → propose `ceil(needed / pack_covers_qty)` packs.
+- **`never`** → listed in a "not via Picnic" block, no action. This exists so
+  that "I get meat from the butcher" is answerable once instead of every week;
+  without it the review re-asks forever and gets abandoned by week three.
+- **staple** → own block, **unticked by default**. Phase 3 already models
+  staples as first-class (`GroceryLine.staple`) and keeps them in a separate
+  block; the Picnic layer inherits that split rather than inventing one.
+  Olive oil is in half the recipes and gets bought every three months — it is
+  a pantry question, so it is shown for eyeballing but never added unless
+  ticked.
+
+**Rounding up is always annotated, never silent**: "2 × 500 g = 1000 g, need
+750 g". Leftovers are normal in a kitchen and being short mid-recipe is not, so
+rounding up is the right default — but it changes what you are charged, so it
+has to be visible on the proposed list rather than inferred from the total.
+
+##### Drift
+
+Products get discontinued and ids get reused. Building the page re-resolves
+each mapped product (~20 calls for a week), which also yields current prices;
+anything that fails to resolve, or comes back under a different name than
+`product_name`, drops back into review with a flag rather than being pushed
+silently. Prices are returned in **cents** and `unit_quantity` is free text —
+both are Picnic's format, normalised at the boundary and never stored raw
+except in `picnic_unit_text` for diagnosis.
+
+##### Still out of scope
+
+Placing the order, and choosing a delivery slot. The cart gets built; checkout
+happens in the Picnic app. And if any of this breaks, phase 3's copyable text
+list is untouched and still works — which is why that has to stay good on its
+own.
+
 ## Out of scope
 
 - Weekends (Sat/Sun) — the brainstorm says Mon–Fri; adding two boxes later is
