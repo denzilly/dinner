@@ -34,6 +34,7 @@ import sys
 from pathlib import Path
 
 from python_picnic_api2 import PicnicAPI
+from python_picnic_api2.session import Picnic2FAError, Picnic2FARequired
 
 TOKEN_PATH = Path("/data/picnic-token.txt")
 
@@ -58,29 +59,54 @@ def save_token(token: str) -> None:
     TOKEN_PATH.chmod(0o600)
 
 
+def token_works(picnic: PicnicAPI) -> bool:
+    """Ask the server, don't trust logged_in().
+
+    `logged_in()` only reports whether a token string is set -- it never checks
+    it. A saved token that has expired would pass it and then fail on the first
+    real call, which is a confusing way to find out.
+    """
+    try:
+        picnic.get_user()
+        return True
+    except Exception as exc:                          # noqa: BLE001 -- spike
+        print(f"[auth] saved token rejected ({type(exc).__name__})")
+        return False
+
+
 def connect() -> PicnicAPI:
     """Token first, credentials only as a fallback -- so 2FA happens once ever."""
     token = load_token()
     if token:
         picnic = PicnicAPI(auth_token=token, country_code="NL")
-        if picnic.logged_in():
+        if token_works(picnic):
             print(f"[auth] reused saved token from {TOKEN_PATH}")
             return picnic
-        print("[auth] saved token rejected, falling back to password login")
 
     username = os.environ.get("PICNIC_USERNAME")
     password = os.environ.get("PICNIC_PASSWORD")
     if not (username and password):
         sys.exit("set PICNIC_USERNAME and PICNIC_PASSWORD (in .env) and re-run")
 
-    picnic = PicnicAPI(username=username, password=password, country_code="NL")
+    # Constructed *without* credentials on purpose. Passing them makes __init__
+    # call login() itself, and when the account needs 2FA that raises before the
+    # object is ever assigned -- taking with it the session holding the
+    # intermediate token that /user/2fa/* needs to work. Logging in as a
+    # separate step keeps the object alive across the exception.
+    picnic = PicnicAPI(country_code="NL")
 
-    if not picnic.logged_in():
-        # The library raises on a wrong password, so reaching here generally
-        # means 2FA is required rather than that the credentials were bad.
-        print("[auth] login needs a 2FA code; requesting an SMS")
+    try:
+        picnic.login(username, password)
+    except Picnic2FARequired:
+        print("[auth] account requires 2FA; requesting an SMS code")
         picnic.generate_2fa_code(channel="SMS")
-        picnic.verify_2fa_code(input("code from SMS: ").strip())
+        try:
+            picnic.verify_2fa_code(input("code from SMS: ").strip())
+        except Picnic2FAError as exc:
+            sys.exit(f"2FA failed: {exc} (code={exc.code})")
+
+    if not token_works(picnic):
+        sys.exit("login appeared to succeed but the session is not usable")
 
     token = picnic.session.auth_token
     if token:
@@ -151,8 +177,10 @@ def main() -> int:
     picnic = connect()
 
     user = picnic.get_user()
-    print(f"[user] {getattr(user, 'firstname', '?')} — "
-          f"{getattr(user, 'household_details', None) or 'household details unavailable'}")
+    # total_deliveries doubles as a sanity check that this is the right account
+    # and that the session is really reading live data, not a cached shell.
+    print(f"\n[user] {user.firstname} {user.lastname}, "
+          f"{user.total_deliveries} deliveries to date")
 
     product_id = show_search(picnic)
 
