@@ -177,10 +177,13 @@ def main() -> int:
     picnic = connect()
 
     user = picnic.get_user()
-    # total_deliveries doubles as a sanity check that this is the right account
-    # and that the session is really reading live data, not a cached shell.
-    print(f"\n[user] {user.firstname} {user.lastname}, "
-          f"{user.total_deliveries} deliveries to date")
+    # Not firstname/deliveries: both are empty on an account that hasn't ordered
+    # yet, which reads exactly like a broken session and isn't one. These fields
+    # are populated as soon as the session is genuinely authenticated.
+    raw = user.raw or {}
+    print(f"\n[user] {raw.get('customer_type', '?')}, "
+          f"contact set: {bool(raw.get('contact_email'))}, "
+          f"address set: {bool(raw.get('address'))}")
 
     product_id = show_search(picnic)
 

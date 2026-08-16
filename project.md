@@ -555,11 +555,56 @@ confirmation) is what makes it tolerable over time.
 basket, then review and check out in the Picnic app. Ordering the wrong thing
 unattended is a real cost, and it avoids automating a purchase behind SMS 2FA.
 
-**Risks** to accept before starting: credentials live in `.env`; SMS 2FA
-complicates unattended runs; unofficial use may sit awkwardly with Picnic's
-terms. Failure at any point degrades to phase 3's copyable text list, which is
-why that has to stay good on its own. Worth a spike — log in, search one
-product, add it to a cart — before committing to the phase.
+**Risks** to accept before starting: credentials live in `.env`; ~~SMS 2FA
+complicates unattended runs~~ (resolved, see below); unofficial use may sit
+awkwardly with Picnic's terms. Failure at any point degrades to phase 3's
+copyable text list, which is why that has to stay good on its own.
+
+#### Spike results, 2026-08-16 (`spikes/picnic_spike.py`)
+
+All three risky calls proven against the live API with
+`python-picnic-api2` 2.0.1 on Python 3.13.15: login (2FA), search, and cart
+add + remove. Cart returned to 0 items afterwards.
+
+**2FA is not a blocker for unattended runs.** `PicnicAPI(auth_token=...)` plus
+`session.auth_token` means the SMS is a one-time interactive cost; the token is
+captured once and reused. Verified by re-running with no credentials present.
+Kept in `data/picnic-token.txt` (gitignored, mode 600). Unknown yet: how long
+the token stays valid, so the weekly job still needs to fail loudly rather than
+silently when it expires.
+
+Two library details worth knowing before building against it:
+
+- Passing credentials to `PicnicAPI()` makes `__init__` call `login()`, which
+  on a 2FA account raises *before the object is assigned* — taking the session
+  holding the intermediate token with it. Construct first, log in second.
+- `logged_in()` only reports whether a token string is set. It never checks it
+  with the server, so an expired token passes and fails on the next call.
+  Validate with a real request instead.
+
+**What the search data actually shows.** Prices come back in cents, and
+`unit_quantity` is a free-text string ("300 gram", "3 stuks", "1 kilo"). The
+demo bank already exercises four distinct matching shapes:
+
+| ingredient line | what Picnic offers | difficulty |
+|---|---|---|
+| `500 g rundergehakt` | 175/300/**500** g, 1 kg | easy — exact pack exists |
+| a 400 g quantity | nearest packs are 300 g and 500 g | needs a round-up rule |
+| `2 uien` | "1 stuk" 45c, "3 stuks" 109, "1 kilo" 129 | count → count, several valid answers |
+| `1 rookworst` | 250/275/285/375/550 **gram**, no count | count → weight, genuinely ambiguous |
+| `olijfolie` (staple, no quantity) | 200 ml spray … 750 ml bottle | quantity is meaningless; it's a pantry question |
+
+**Ranking cannot be trusted, and this is the real finding.** The top hit for
+`olijfolie` is an olive oil *spray*; `rookworst` returns a vegetarian version
+and "bockworsten" (a different sausage) among the first five; `uien` mixes red
+onions into a search for yellow. Auto-selecting the first result would be
+quietly wrong often enough to poison a shopping list — which is what makes the
+learned `ingredient_id` → `picnic_product_id` mapping above load-bearing rather
+than an optimisation. It has to be confirmed by a human once, and the pack size
+stored with it so quantities can be scaled without searching again.
+
+There is also a cheapest-vs-waste tradeoff no rule should silently pick:
+rundergehakt is €14.17/kg at 300 g, €11.10/kg at 500 g and €10.79/kg at 1 kg.
 
 ## Out of scope
 
