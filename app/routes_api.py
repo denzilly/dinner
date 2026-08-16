@@ -56,17 +56,30 @@ def _ingest_payload(payload: dict) -> tuple[dict, int]:
                 "title": existing["title"],
             }, 200
     else:
+        # A hand-built payload goes through the same parsers as an extracted
+        # page. Passing these straight through was how 'servings': 'abc' reached
+        # an INTEGER column as text -- the normalisation this module promises has
+        # to cover both branches, not just the URL one.
+        servings, servings_warnings = extract.parse_servings(payload.get("servings"))
+        prep_minutes, prep_warnings = extract.parse_minutes(payload.get("prep_minutes"))
+        cook_minutes, cook_warnings = extract.parse_minutes(payload.get("cook_minutes"))
+
         extracted = extract.ExtractedRecipe(
             title=(payload.get("title") or "").strip(),
             source_url=(payload.get("source_url") or "").strip() or None,
             source_name=(payload.get("source_name") or "").strip() or None,
             instructions=payload.get("instructions"),
-            servings=payload.get("servings"),
-            prep_minutes=payload.get("prep_minutes"),
-            cook_minutes=payload.get("cook_minutes"),
+            servings=servings,
+            prep_minutes=prep_minutes,
+            cook_minutes=cook_minutes,
             ingredient_lines=[str(line) for line in (payload.get("ingredients") or [])],
             suggested_tags=[str(tag) for tag in (payload.get("tags") or [])],
             extraction="manual",
+            warnings=[
+                *servings_warnings,
+                *(f"prep time: {w}" for w in prep_warnings),
+                *(f"cook time: {w}" for w in cook_warnings),
+            ],
         )
         recipe_id = None
 
@@ -76,6 +89,18 @@ def _ingest_payload(payload: dict) -> tuple[dict, int]:
         return {"error": "No ingredients found."}, 422
 
     parsed = parse.parse_lines(extracted.ingredient_lines)
+
+    # An unknown yield is stored as the schema's default so the write can't fail,
+    # which makes it indistinguishable from a stated yield of 4 once it lands.
+    # Record that it was assumed, so the review card can ask for a real number
+    # instead of quietly presenting the default as fact.
+    needs = []
+    if extracted.servings is None:
+        needs.append("servings")
+        extracted.warnings.append(
+            f"no serving count found — assumed {queries.DEFAULT_SERVINGS}; "
+            "set the real one before accepting"
+        )
 
     warnings = [{"line": None, "warnings": extracted.warnings}] if extracted.warnings else []
     warnings += [
@@ -99,6 +124,7 @@ def _ingest_payload(payload: dict) -> tuple[dict, int]:
         extraction_warnings={
             "suggested_tags": extracted.suggested_tags,
             "lines": warnings,
+            "needs": needs,
         },
     )
 

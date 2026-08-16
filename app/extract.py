@@ -207,22 +207,59 @@ def parse_servings(value) -> tuple[int | None, list[str]]:
     applies by taking the upper bound of an amount.
     """
     warnings: list[str] = []
-    if value is None:
+    if value is None or value == "":
         return None, warnings
     if isinstance(value, list):
         value = value[0] if value else None
         warnings.append("recipe listed several yields; used the first")
+        if value is None:
+            return None, warnings
+    # bool before int: True would otherwise read as a yield of 1.
+    if isinstance(value, bool):
+        return None, warnings + [f"yield '{value}' is not a number"]
     if isinstance(value, (int, float)):
-        return int(value) or None, warnings
+        count = int(value)
+        if count > 0:
+            return count, warnings
+        return None, warnings + [f"yield '{value}' is not a positive number"]
     if not isinstance(value, str):
-        return None, warnings
+        return None, warnings + [f"could not read a yield from a {type(value).__name__}"]
 
-    numbers = [int(n) for n in re.findall(r"\d+", value)]
+    numbers = [n for n in (int(match) for match in re.findall(r"\d+", value)) if n > 0]
     if not numbers:
-        return None, warnings
+        # Returning None silently would let the caller's default stand in for a
+        # value the source actually stated -- say so instead, so review can catch it.
+        return None, warnings + [f"could not read a serving count from '{value.strip()}'"]
     if len(numbers) > 1:
         warnings.append(f"yield '{value.strip()}' is a range; used {min(numbers)}")
     return min(numbers), warnings
+
+
+def parse_minutes(value) -> tuple[int | None, list[str]]:
+    """A time from a hand-built payload -> whole minutes.
+
+    JSON-LD gives ISO-8601, which parse_duration_minutes already handles, but a
+    payload assembled by hand is just as likely to say 30 or '30'. Accept all
+    three; report anything else rather than letting it reach an INTEGER column
+    as text, where SQLite stores it verbatim and later reads it back as 0.
+    """
+    if value is None or value == "":
+        return None, []
+    if isinstance(value, bool):
+        return None, [f"'{value}' is not a time in minutes"]
+    if isinstance(value, (int, float)):
+        minutes = int(value)
+        if minutes > 0:
+            return minutes, []
+        return None, [f"'{value}' is not a positive time in minutes"]
+    if isinstance(value, str):
+        text = value.strip()
+        iso = parse_duration_minutes(text)
+        if iso is not None:
+            return iso, []
+        if re.fullmatch(r"\d+", text):
+            return int(text) or None, []
+    return None, [f"could not read a time in minutes from '{value}'"]
 
 
 def _instructions_to_text(value) -> str | None:

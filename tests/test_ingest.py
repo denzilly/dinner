@@ -4,6 +4,8 @@ Network is never touched: extract.from_url is replaced with a stub, so these
 stay fast and deterministic. Live extraction is covered by test_extract.py's
 offline fixtures plus the demo-bank check.
 """
+import json
+
 import pytest
 
 from app import extract, queries
@@ -147,11 +149,13 @@ def test_ingest_requires_title_and_ingredients(client, auth):
                        json={"title": "Empty"}).status_code == 422
 
 
-# --- missing servings -----------------------------------------------------
+# --- servings that can't be read ------------------------------------------
 #
 # recipes.servings is NOT NULL, so every path that can leave it unset used to
-# reach SQLite as an IntegrityError and surface as a 500. A missing yield is
-# ordinary input, not an error: it falls back to the schema's default of 4.
+# reach SQLite as an IntegrityError and surface as a 500. Ingest still succeeds
+# -- an unstated yield is ordinary input -- but the assumed default is flagged
+# for review rather than presented as though it came from the source, and the
+# recipe cannot be accepted into the bank until someone supplies a real number.
 
 def test_ingest_without_servings_defaults(client, auth, app):
     response = client.post("/api/recipes/ingest", headers=auth, json={
@@ -192,6 +196,102 @@ def test_new_recipe_form_without_servings_defaults(client, app):
     with app.app_context():
         found = queries.search_recipes(query="Boerenkool")
         assert [row["servings"] for row in found] == [4]
+
+
+@pytest.mark.parametrize("value", ["abc", -3, 0, True, {"n": 4}])
+def test_unreadable_servings_is_flagged_not_stored(client, auth, app, value):
+    """Whatever was sent, an INTEGER column must never receive it verbatim."""
+    response = client.post("/api/recipes/ingest", headers=auth, json={
+        "title": f"Junk {value!r}",
+        "ingredients": ["2 uien"],
+        "servings": value,
+    })
+    assert response.status_code == 201
+
+    with app.app_context():
+        stored = queries.get_recipe(response.get_json()["id"])["servings"]
+    assert isinstance(stored, int) and stored > 0
+
+    page = client.get("/recipes/review")
+    assert b"not found" in page.data
+
+
+def test_unreadable_minutes_is_flagged_not_stored(client, auth, app):
+    """Text in prep_minutes reads back as 0 in SQLite arithmetic, so a garbage
+    time would silently match every "quick meals" filter."""
+    response = client.post("/api/recipes/ingest", headers=auth, json={
+        "title": "Vague timing",
+        "ingredients": ["2 uien"],
+        "servings": 4,
+        "prep_minutes": "about twenty",
+    })
+    assert response.status_code == 201
+
+    with app.app_context():
+        assert queries.get_recipe(response.get_json()["id"])["prep_minutes"] is None
+
+    assert b"could not read a time in minutes" in client.get("/recipes/review").data
+
+
+def test_assumed_servings_is_not_prefilled_in_review(client, auth):
+    """Pre-filling the default would make an assumption look like a fact."""
+    client.post("/api/recipes/ingest", headers=auth,
+                json={"title": "No yield", "ingredients": ["2 uien"]})
+    page = client.get("/recipes/review").data
+    assert b"not found" in page
+    assert b"assumed 4" in page
+    assert b'value=""' in page          # the servings box is left empty
+
+
+def test_stated_yield_is_not_flagged(client, auth, stub_fetch):
+    """The complement of the test above: a yield the source actually stated is
+    pre-filled and unflagged, so the marker means something when it appears."""
+    client.post("/api/recipes/ingest", json={"url": "https://x.test/r"}, headers=auth)
+    page = client.get("/recipes/review").data
+    assert b"not found" not in page
+    assert b'value="8"' in page
+
+
+def test_accept_refused_while_servings_unknown(client, auth, app):
+    created = client.post("/api/recipes/ingest", headers=auth, json={
+        "title": "No yield", "ingredients": ["2 uien"]}).get_json()
+
+    client.post(f"/recipes/{created['id']}/accept", data={"title": "No yield"})
+
+    with app.app_context():
+        # Still in the queue, not in the bank.
+        assert queries.get_recipe(created["id"])["status"] == "suggested"
+        assert queries.suggestion_count() == 1
+
+
+def test_accept_allowed_once_servings_supplied(client, auth, app):
+    created = client.post("/api/recipes/ingest", headers=auth, json={
+        "title": "No yield", "ingredients": ["2 uien"]}).get_json()
+
+    client.post(f"/recipes/{created['id']}/accept",
+                data={"title": "No yield", "servings": "6"})
+
+    with app.app_context():
+        recipe = queries.get_recipe(created["id"])
+        assert recipe["status"] == "active"
+        assert recipe["servings"] == 6
+        # The "assumed" marker described a value that no longer exists.
+        assert "needs" not in json.loads(recipe["extraction_warnings"] or "{}")
+
+
+def test_accept_rejects_negative_servings(client, auth, stub_fetch, app):
+    """type=int parses "-3" happily; a negative divisor would invert every
+    quantity on the grocery list."""
+    created = client.post("/api/recipes/ingest",
+                          json={"url": "https://x.test/r"}, headers=auth).get_json()
+
+    client.post(f"/recipes/{created['id']}/accept",
+                data={"title": "T", "servings": "-3"})
+
+    with app.app_context():
+        recipe = queries.get_recipe(created["id"])
+        assert recipe["status"] == "suggested"
+        assert recipe["servings"] == 8       # unchanged
 
 
 # --- review flow ----------------------------------------------------------

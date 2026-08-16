@@ -33,8 +33,15 @@ def _suggestion_detail(row):
         "warned_lines": warned_lines,
         "recipe_warnings": recipe_warnings,
         "suggested_tags": extra.get("suggested_tags", []),
+        "needs_servings": _needs_servings(row),
         "warning_count": sum(len(w) for w in warned_lines.values()) + len(recipe_warnings),
     }
+
+
+def _needs_servings(row) -> bool:
+    """True when the stored servings is an assumed default, not a real yield."""
+    extra = json.loads(row["extraction_warnings"]) if row["extraction_warnings"] else {}
+    return "servings" in extra.get("needs", [])
 
 
 @bp.get("/")
@@ -114,6 +121,20 @@ def accept(recipe_id):
     title = request.form.get("title", "").strip()
     servings = request.form.get("servings", type=int)
 
+    # type=int takes "-3" happily, and a recipe whose yield was only ever assumed
+    # must not reach the bank on that assumption: servings is the divisor for
+    # every grocery quantity, so a wrong one is wrong on the shopping list.
+    if servings is not None and servings < 1:
+        flash("Servings has to be a positive number.", "error")
+        return redirect(url_for("recipes.review", _anchor=f"recipe-{recipe_id}"))
+    if servings is None and _needs_servings(recipe):
+        flash(
+            f"“{recipe['title']}” has no serving count — set the number it serves "
+            "before accepting it.",
+            "error",
+        )
+        return redirect(url_for("recipes.review", _anchor=f"recipe-{recipe_id}"))
+
     tag_ids = [int(value) for value in request.form.getlist("tag_id") if value.isdigit()]
     for name in request.form.getlist("new_tag"):
         if name.strip():
@@ -127,6 +148,7 @@ def accept(recipe_id):
     conn.commit()
 
     queries.set_recipe_tags(recipe_id, tag_ids)
+    queries.clear_needs(recipe_id)
     queries.set_status(recipe_id, "active")
     flash(f"Added “{title or recipe['title']}” to the bank.", "success")
     return redirect(url_for("recipes.review"))

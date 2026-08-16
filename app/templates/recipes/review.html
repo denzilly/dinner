@@ -34,9 +34,13 @@
           · <a href="{{ recipe.source_url }}" target="_blank" rel="noopener noreferrer">original</a>
         {% endif %}
         · <label>serves
-            <input type="number" name="servings" min="1" value="{{ recipe.servings or '' }}"
-                   class="input-tiny">
+            {# An assumed yield is left blank rather than pre-filled: showing the
+               default as if it were extracted is the one thing review can't catch. #}
+            <input type="number" name="servings" min="1" class="input-tiny"
+                   value="{{ '' if item.needs_servings else recipe.servings or '' }}"
+                   {% if item.needs_servings %}required aria-label="Servings — not found, needs a number"{% endif %}>
           </label>
+          {% if item.needs_servings %}<span class="needs-value">not found</span>{% endif %}
         {% if recipe.prep_minutes or recipe.cook_minutes %}
           · {{ (recipe.prep_minutes or 0) + (recipe.cook_minutes or 0) }} min
         {% endif %}

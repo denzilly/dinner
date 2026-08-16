@@ -557,6 +557,28 @@ def ingredient_names() -> list[str]:
             get_db().execute("SELECT name FROM ingredients ORDER BY name COLLATE NOCASE")]
 
 
+def clear_needs(recipe_id: int) -> None:
+    """Drop the "this value was assumed" markers once a human has supplied one.
+
+    Left in place they would outlive the thing they describe, and a stale claim
+    that a confirmed yield is guesswork is worse than no claim at all.
+    """
+    conn = get_db()
+    row = conn.execute(
+        "SELECT extraction_warnings FROM recipes WHERE id = ?", (recipe_id,)
+    ).fetchone()
+    if row is None or not row["extraction_warnings"]:
+        return
+    extra = json.loads(row["extraction_warnings"])
+    if not extra.pop("needs", None):
+        return
+    conn.execute(
+        "UPDATE recipes SET extraction_warnings = ? WHERE id = ?",
+        (json.dumps(extra), recipe_id),
+    )
+    conn.commit()
+
+
 def set_status(recipe_id: int, status: str) -> None:
     conn = get_db()
     conn.execute(

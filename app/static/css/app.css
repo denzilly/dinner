@@ -577,6 +577,14 @@ button { cursor: pointer; }
 
 .ing-note { color: var(--muted); font-size: 0.85em; }
 
+/* Not muted like .ing-note: this one is asking for an answer, not annotating. */
+.needs-value {
+  padding: 0.05rem 0.35rem;
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  font-size: 0.8em;
+}
+
 /* Chips and filters */
 
 .filters { margin-bottom: 1.25rem; display: grid; gap: 0.6rem; }

@@ -453,8 +453,38 @@ indefinitely on its own.
   so it defaults rather than 4xx'ing: rejecting would make URL ingest hostage
   to the source site's markup, and grocery scaling needs *some* number. The
   whole suite missed it because every existing ingest test passed an explicit
-  `servings`; the three regression tests in `test_ingest.py` cover one path
-  each.
+  `servings`; the regression tests in `test_ingest.py` cover one path each.
+- **…and the values themselves were never normalised.** The same look found
+  that the API's manual branch passed `servings`/`prep_minutes`/`cook_minutes`
+  from raw JSON straight to SQLite, despite this module's docstring promising
+  normalisation "in one place" — only the URL branch actually did it. Because
+  those columns have INTEGER affinity rather than a type check, `'abc'` was
+  stored verbatim and came back out as a `TypeError` in `grocery.scale_factor`
+  — a 500 on the grocery page, days later, nowhere near the ingest that caused
+  it. `-3` was worse: it stored fine and silently inverted every quantity on
+  the list. Garbage minutes evaluate to `0` in SQLite arithmetic, so a recipe
+  with an unreadable prep time matched *every* "quick meals" filter.
+
+  The fix is that the manual branch now goes through the same
+  `extract.parse_servings` / `parse_minutes` the URL branch uses, so there is
+  no second validation layer to keep in step — the promise the docstring
+  already made is just kept. Rejecting the request with a 4xx was considered
+  and dropped: an unattended poster (the phase-5 sweep posts through this same
+  path) would lose the whole recipe over one bad field.
+
+  **The assumption is surfaced rather than silently applied.** Because the
+  column is `NOT NULL`, an unknown yield has to be stored as *something*, which
+  makes it indistinguishable from a stated yield of 4 — the review card would
+  have shown a pre-filled `4` and the reviewer nothing to notice. So ingest
+  records a `needs` marker in `extraction_warnings`; the card leaves the box
+  empty, flags it "not found", and `accept` refuses until a real number is
+  supplied. That reuses the review queue the ingest path already funnels
+  everything through, rather than inventing a gate. `queries.clear_needs` drops
+  the marker on accept, so it never outlives the guess it describes.
+
+  Nothing unreviewed could reach the grocery list anyway — `planner.candidates`
+  filters to `status='active'` — so this is about the reviewer not accepting
+  blind, not about blocking ingest.
 
 ### Phase 5 — Weekly discovery sweep (later, to be specified)
 
