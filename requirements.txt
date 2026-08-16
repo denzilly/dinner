@@ -2,5 +2,13 @@
 Flask==3.1.0
 gunicorn==23.0.0
 python-dotenv==1.0.1
-requests==2.32.3
+# Bumped from 2.32.3 for python-picnic-api2, which requires >=2.34.2. Not a
+# casual bump: extract.py fetches recipe pages through this, SSRF guard and
+# redirect handling included, so test_extract.py's offline fixtures are the
+# check that behaviour is unchanged.
+requests==2.34.2
 beautifulsoup4==4.12.3
+# Phase 6. Unofficial Picnic client -- see project.md for why this fork and not
+# the original. Imported lazily in app/picnic.py so the rest of the app still
+# runs if it is missing or broken by an upstream change.
+python-picnic-api2==2.0.1

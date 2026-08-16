@@ -42,6 +42,12 @@ class Line:
     staple: bool = False
     split: bool = False        # more than one family -> could not be combined
 
+    # family -> total in that family's base unit (g, ml, or a count). The
+    # rendered `segments` above are for reading; this is the same aggregation
+    # kept in numbers, because phase 6 has to divide it by a pack size. Derived
+    # here rather than recomputed there so there is only ever one aggregation.
+    totals: dict[str, float] = field(default_factory=dict)
+
     @property
     def amount(self) -> str:
         return " + ".join(self.segments)
@@ -162,6 +168,7 @@ def build_lines(entries) -> list[Line]:
                 # anywhere in the week.
                 staple=not segments and key in staples,
                 split=len(segments) > 1,
+                totals=dict(families),
             )
         )
 

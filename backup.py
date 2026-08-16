@@ -45,6 +45,9 @@ TABLES = [
     "plan_days",
     "grocery_lists",
     "grocery_items",
+    # Every row is a human decision made once at a review screen -- the most
+    # expensive data here to reproduce, per row, of anything in this list.
+    "picnic_products",
 ]
 
 FORMAT_VERSION = 1

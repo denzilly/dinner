@@ -34,6 +34,8 @@
     </form>
     <button type="button" class="button" id="copy-list">Copy as text</button>
     <a class="button" href="{{ url_for('grocery.ingredients') }}">Aisles</a>
+    {# A link out, not a section: this page stays the simple one you shop from. #}
+    <a class="button" href="{{ url_for('picnic.show', week=monday.isoformat()) }}">Picnic basket</a>
   </div>
 
   {% for aisle, lines in grouped %}

@@ -43,3 +43,14 @@ SITE_PASSWORD = _env("SITE_PASSWORD")
 INGEST_TOKEN = _env("INGEST_TOKEN")
 
 SESSION_DAYS = int(_env("SESSION_DAYS", "30"))
+
+# --- Picnic (phase 6) ------------------------------------------------------
+#
+# Credentials are only needed for the first login. Picnic requires SMS 2FA,
+# which cannot be answered by a background process, so the auth token from that
+# one interactive login is written to PICNIC_TOKEN_PATH and reused from then on
+# -- see spikes/picnic_spike.py, which is what establishes the token.
+PICNIC_USERNAME = _env("PICNIC_USERNAME")
+PICNIC_PASSWORD = _env("PICNIC_PASSWORD")
+PICNIC_TOKEN_PATH = _env("PICNIC_TOKEN_PATH", str(BASE_DIR / "data" / "picnic-token.txt"))
+PICNIC_COUNTRY = _env("PICNIC_COUNTRY", "NL")

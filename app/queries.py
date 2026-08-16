@@ -465,6 +465,13 @@ def delete_item(item_id: int) -> None:
     conn.commit()
 
 
+def get_ingredient(ingredient_id: int) -> sqlite3.Row | None:
+    return get_db().execute(
+        "SELECT id, name, aisle, default_unit FROM ingredients WHERE id = ?",
+        (ingredient_id,),
+    ).fetchone()
+
+
 def all_ingredients() -> list[sqlite3.Row]:
     return get_db().execute(
         """SELECT i.id, i.name, i.aisle, COUNT(ri.recipe_id) AS uses
@@ -555,6 +562,73 @@ def tags_with_counts() -> list[sqlite3.Row]:
 def ingredient_names() -> list[str]:
     return [row["name"] for row in
             get_db().execute("SELECT name FROM ingredients ORDER BY name COLLATE NOCASE")]
+
+
+def picnic_mappings(ingredient_ids=()) -> dict[int, sqlite3.Row]:
+    """ingredient_id -> its confirmed Picnic decision, for the ids given."""
+    ids = [int(value) for value in ingredient_ids if value is not None]
+    if not ids:
+        return {}
+    placeholders = ",".join("?" * len(ids))
+    rows = get_db().execute(
+        f"SELECT * FROM picnic_products WHERE ingredient_id IN ({placeholders})", ids
+    )
+    return {row["ingredient_id"]: row for row in rows}
+
+
+def set_picnic_mapping(
+    ingredient_id: int,
+    *,
+    product_id: str,
+    product_name: str | None,
+    pack_covers_qty: float,
+    pack_covers_unit: str,
+    picnic_unit_text: str | None = None,
+) -> None:
+    """Record "this ingredient is that product", replacing any earlier answer."""
+    get_db().execute(
+        """INSERT INTO picnic_products
+               (ingredient_id, decision, product_id, product_name,
+                pack_covers_qty, pack_covers_unit, picnic_unit_text, confirmed_at)
+           VALUES (?, 'mapped', ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(ingredient_id) DO UPDATE SET
+               decision='mapped', product_id=excluded.product_id,
+               product_name=excluded.product_name,
+               pack_covers_qty=excluded.pack_covers_qty,
+               pack_covers_unit=excluded.pack_covers_unit,
+               picnic_unit_text=excluded.picnic_unit_text,
+               confirmed_at=excluded.confirmed_at""",
+        (ingredient_id, product_id, product_name, pack_covers_qty, pack_covers_unit,
+         picnic_unit_text, datetime.now(timezone.utc).isoformat(timespec="seconds")),
+    )
+    get_db().commit()
+
+
+def set_picnic_never(ingredient_id: int) -> None:
+    """Record "never buy this via Picnic" -- the butcher/market/pantry answer.
+
+    Stored rather than inferred so it is asked once instead of every week; the
+    columns are cleared so a stale product can't reappear if it is re-mapped.
+    """
+    get_db().execute(
+        """INSERT INTO picnic_products
+               (ingredient_id, decision, product_id, product_name,
+                pack_covers_qty, pack_covers_unit, picnic_unit_text, confirmed_at)
+           VALUES (?, 'never', NULL, NULL, NULL, NULL, NULL, ?)
+           ON CONFLICT(ingredient_id) DO UPDATE SET
+               decision='never', product_id=NULL, product_name=NULL,
+               pack_covers_qty=NULL, pack_covers_unit=NULL, picnic_unit_text=NULL,
+               confirmed_at=excluded.confirmed_at""",
+        (ingredient_id, datetime.now(timezone.utc).isoformat(timespec="seconds")),
+    )
+    get_db().commit()
+
+
+def clear_picnic_mapping(ingredient_id: int) -> None:
+    """Forget a decision, sending the ingredient back to the review list."""
+    conn = get_db()
+    conn.execute("DELETE FROM picnic_products WHERE ingredient_id = ?", (ingredient_id,))
+    conn.commit()
 
 
 def clear_needs(recipe_id: int) -> None:

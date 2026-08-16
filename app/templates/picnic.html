@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block title %}Picnic basket — Dinner{% endblock %}
+
+{% block content %}
+<h1>Proposed Picnic basket</h1>
+
+<p class="card__meta">
+  Week of {{ monday.strftime('%-d %B') }} ·
+  <a href="{{ url_for('picnic.show', week=previous_week) }}">previous</a> ·
+  <a href="{{ url_for('picnic.show', week=next_week) }}">next</a> ·
+  <a href="{{ url_for('grocery.show', week=monday.isoformat()) }}">the shopping list</a>
+</p>
+
+{% if not has_anything %}
+  <p class="empty-state">
+    Nothing planned for this week yet —
+    <a href="{{ url_for('plan.week', week=monday.isoformat()) }}">plan some days</a> first.
+  </p>
+{% else %}
+
+<form method="post" action="{{ url_for('picnic.push') }}">
+  <input type="hidden" name="week" value="{{ monday.isoformat() }}">
+
+  {% if undecided %}
+    <h2>Needs a choice</h2>
+    <p class="warnings">
+      Picnic's search ranking can't be trusted, so nothing here is picked
+      automatically. Confirm each one once and it won't be asked again.
+    </p>
+    <ul class="ingredients">
+      {% for line in undecided %}
+        <li>
+          <span class="qty">{{ line.amount }}</span> {{ line.name }}
+          <a class="button" href="{{ url_for('picnic.choose', ingredient_id=line.ingredient_id, week=monday.isoformat()) }}">Choose product</a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+
+  {% if proposed %}
+    <h2>In the basket</h2>
+    <ul class="ingredients">
+      {% for item in proposed %}
+        <li>
+          <label>
+            <input type="checkbox" name="include"
+                   value="{{ item.line.ingredient_id }}"
+                   {% if not item.stale %}checked{% endif %}>
+            {% if item.plan %}
+              <span class="qty">{{ item.plan.packs }}&times;</span>
+            {% endif %}
+            {{ item.mapping.product_name or item.line.name }}
+          </label>
+
+          {% if item.plan %}
+            {# Rounding up changes what you're charged, so it's stated here
+               rather than left to be inferred from the total. #}
+            <span class="ing-note">{{ item.plan.summary }}</span>
+          {% endif %}
+
+          {% if item.stale %}
+            <span class="needs-value">no longer matches — the recipes ask for
+              {{ item.line.amount }}</span>
+          {% endif %}
+          {% if item.partial %}
+            <span class="needs-value">only covers part of “{{ item.line.amount }}”</span>
+          {% endif %}
+
+          <a href="{{ url_for('picnic.choose', ingredient_id=item.line.ingredient_id, week=monday.isoformat()) }}">change</a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+
+  {% if staples %}
+    <h2>Staples</h2>
+    <p class="card__meta">
+      Not added unless you tick them — these get bought every few months, not
+      every week.
+    </p>
+    <ul class="ingredients">
+      {% for item in staples %}
+        <li>
+          {% if item.mapping and item.mapping.decision == 'mapped' %}
+            <label>
+              <input type="checkbox" name="include" value="{{ item.line.ingredient_id }}">
+              {{ item.mapping.product_name or item.line.name }}
+            </label>
+            <span class="ing-note">one pack</span>
+          {% else %}
+            {{ item.line.name }}
+            <a href="{{ url_for('picnic.choose', ingredient_id=item.line.ingredient_id, week=monday.isoformat()) }}">choose product</a>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+
+  {% if never %}
+    <h2>Not via Picnic</h2>
+    <p class="card__meta">Left for the shopping list — asked once, not weekly.</p>
+    <ul class="ingredients">
+      {% for item in never %}
+        <li>
+          <span class="qty">{{ item.line.amount }}</span> {{ item.line.name }}
+          <a href="{{ url_for('picnic.choose', ingredient_id=item.line.ingredient_id, week=monday.isoformat()) }}">reconsider</a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+
+  {% if proposed or staples %}
+    <div class="card__actions">
+      <button type="submit" class="button button--primary">Add to Picnic basket</button>
+    </div>
+    <p class="card__meta">
+      This only fills the basket. Delivery slot and checkout happen in the
+      Picnic app.
+    </p>
+  {% endif %}
+</form>
+
+{% endif %}
+{% endblock %}

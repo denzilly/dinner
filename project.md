@@ -667,11 +667,14 @@ machine only ever divides within one.**
 
 ##### The proposed cart page
 
-A separate page (`/groceries/picnic`), not part of the grocery list itself —
-that page is used one-handed in a supermarket and product-picking would wreck
-it. Computed on demand from the week's grocery list; nothing is persisted
-except the mapping, exactly as the grocery list itself is derived rather than
-stored.
+A **completely separate page** (`/groceries/picnic`), not part of the grocery
+list itself. Phase 3's list is the simple one you take to the store to shop
+yourself — used one-handed in a supermarket — and it stays exactly that.
+Product-picking, alternatives and pack maths would wreck it. Two pages, two
+jobs: one to shop from, one to build a basket from.
+
+Computed on demand from the week's grocery list; nothing is persisted except
+the mapping, exactly as the grocery list itself is derived rather than stored.
 
 Per line:
 
@@ -703,6 +706,31 @@ anything that fails to resolve, or comes back under a different name than
 silently. Prices are returned in **cents** and `unit_quantity` is free text —
 both are Picnic's format, normalised at the boundary and never stored raw
 except in `picnic_unit_text` for diagnosis.
+
+##### Built 2026-08-16
+
+`/groceries/picnic` (`routes_picnic.py`, `app/picnic.py`, migration
+`002_picnic.sql`), reached by a link from the grocery list rather than being
+part of it. Pack arithmetic is pure and tested offline; the API half is stubbed
+in tests the same way `extract.from_url` is. 31 tests.
+
+Two decisions taken while building:
+
+- **The proposed-cart page makes no API calls at all.** Re-resolving every
+  mapped product on load meant ~20 sequential round-trips before anything
+  rendered. Searching happens on the per-ingredient choose page instead, and
+  the authoritative prices come back from Picnic's own cart after the push --
+  better than an estimate assembled here. The cost is that drift shows up at
+  push time rather than before it, reported per item.
+- **`requests` bumped 2.32.3 -> 2.34.2**, because `python-picnic-api2`
+  requires `>=2.34.2` and the build refused otherwise. Contrary to
+  HANDOVER.md's "don't bump the pins", but with a reason. `extract.py` fetches
+  recipe pages through `requests`, SSRF guard and redirects included, so
+  `test_extract.py`'s offline fixtures are what makes this safe to do.
+
+`picnic_products` is in `backup.py`'s table list: every row is a human decision
+made at a review screen, which makes it per-row the most expensive data in the
+database to reproduce.
 
 ##### Still out of scope
 

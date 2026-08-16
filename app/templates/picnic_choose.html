@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}{{ ingredient.name }} on Picnic — Dinner{% endblock %}
+
+{% block content %}
+<h1>{{ ingredient.name }}</h1>
+
+<p class="card__meta">
+  {% if line %}This week needs <strong>{{ line.amount }}</strong> ·{% endif %}
+  <a href="{{ url_for('picnic.show', week=monday.isoformat()) }}">back to the basket</a>
+</p>
+
+{% if current %}
+  <p class="warnings">
+    Currently
+    {% if current.decision == 'never' %}
+      set to never buy via Picnic.
+    {% else %}
+      “{{ current.product_name or current.product_id }}”, one pack covering
+      {{ current.pack_covers_qty }} {{ current.pack_covers_unit }}.
+    {% endif %}
+  </p>
+{% endif %}
+
+<form class="import" method="get"
+      action="{{ url_for('picnic.choose', ingredient_id=ingredient.id) }}">
+  <input type="hidden" name="week" value="{{ monday.isoformat() }}">
+  <label for="q">Search Picnic</label>
+  <input id="q" name="q" value="{{ query }}">
+  <button type="submit">Search</button>
+</form>
+
+{% if error %}
+  <p class="warnings">{{ error }}</p>
+{% elif not hits %}
+  <p class="empty-state">No results for “{{ query }}”. Try another wording.</p>
+{% endif %}
+
+{% for hit in hits %}
+  <article class="card">
+    <form method="post"
+          action="{{ url_for('picnic.confirm', ingredient_id=ingredient.id) }}">
+      <input type="hidden" name="week" value="{{ monday.isoformat() }}">
+      <input type="hidden" name="product_id" value="{{ hit.product_id }}">
+      <input type="hidden" name="product_name" value="{{ hit.name }}">
+      <input type="hidden" name="picnic_unit_text" value="{{ hit.unit_text or '' }}">
+
+      <div class="card__head">
+        <span class="card__title">{{ hit.name }}</span>
+        {% if hit.price %}<span class="pill">{{ hit.price }}</span>{% endif %}
+      </div>
+
+      <p class="card__meta">
+        {{ hit.unit_text or 'no stated size' }}
+        {# Cheapest and least-waste genuinely disagree -- 300g gehakt is
+           EUR 14.17/kg, the 1kg pack EUR 10.79/kg -- so both are shown and
+           the choice stays the shopper's. #}
+        {% if hit.per_unit %} · {{ hit.per_unit }}{% endif %}
+      </p>
+
+      <p class="card__meta">
+        One pack covers
+        <input class="input-tiny" type="text" name="pack_covers_qty" required
+               value="{{ hit.parsed[0] if hit.parsed else '' }}">
+        <select name="pack_covers_unit" aria-label="Unit">
+          {% for unit in units %}
+            <option value="{{ unit }}"
+              {% if hit.parsed and hit.parsed[1] == unit %}selected{% endif %}>{{ unit }}</option>
+          {% endfor %}
+        </select>
+        of {{ ingredient.name }}
+      </p>
+
+      {% if not hit.parsed %}
+        <p class="warnings">
+          Picnic states this as “{{ hit.unit_text or 'nothing' }}”, which doesn't
+          convert to a recipe unit — say what one pack covers.
+        </p>
+      {% endif %}
+
+      <div class="card__actions">
+        <button type="submit" class="button button--primary">Use this one</button>
+      </div>
+    </form>
+  </article>
+{% endfor %}
+
+<article class="card">
+  <form method="post" action="{{ url_for('picnic.confirm', ingredient_id=ingredient.id) }}">
+    <input type="hidden" name="week" value="{{ monday.isoformat() }}">
+    <p class="card__meta">
+      Buy this somewhere else — the butcher, the market, or it lives in the
+      cupboard. It stays on the shopping list and stops being offered here.
+    </p>
+    <div class="card__actions">
+      <button type="submit" name="action" value="never" class="button">Never via Picnic</button>
+      {% if current %}
+        <button type="submit" name="action" value="forget" class="link-button">Forget this decision</button>
+      {% endif %}
+    </div>
+  </form>
+</article>
+{% endblock %}
