@@ -147,6 +147,53 @@ def test_ingest_requires_title_and_ingredients(client, auth):
                        json={"title": "Empty"}).status_code == 422
 
 
+# --- missing servings -----------------------------------------------------
+#
+# recipes.servings is NOT NULL, so every path that can leave it unset used to
+# reach SQLite as an IntegrityError and surface as a 500. A missing yield is
+# ordinary input, not an error: it falls back to the schema's default of 4.
+
+def test_ingest_without_servings_defaults(client, auth, app):
+    response = client.post("/api/recipes/ingest", headers=auth, json={
+        "title": "Kliekjes",
+        "ingredients": ["2 uien", "500 g gehakt"],
+    })
+    assert response.status_code == 201
+
+    with app.app_context():
+        assert queries.get_recipe(response.get_json()["id"])["servings"] == 4
+
+
+def test_ingest_url_without_yield_defaults(client, auth, app, monkeypatch):
+    """Plenty of sites omit recipeYield entirely -- that must still ingest."""
+    def fake(url):
+        recipe = extract.ExtractedRecipe(**{**SAMPLE.__dict__})
+        recipe.source_url = url
+        recipe.servings = None
+        return recipe
+
+    monkeypatch.setattr(extract, "from_url", fake)
+    response = client.post("/api/recipes/ingest",
+                           json={"url": "https://x.test/no-yield"}, headers=auth)
+    assert response.status_code == 201
+
+    with app.app_context():
+        assert queries.get_recipe(response.get_json()["id"])["servings"] == 4
+
+
+def test_new_recipe_form_without_servings_defaults(client, app):
+    """The add form leaves servings optional, so a blank field must not 500."""
+    response = client.post("/recipes/new", data={
+        "title": "Boerenkool",
+        "ingredients": "1 kg aardappelen\n500 g boerenkool",
+    }, follow_redirects=True)
+    assert response.status_code == 200
+
+    with app.app_context():
+        found = queries.search_recipes(query="Boerenkool")
+        assert [row["servings"] for row in found] == [4]
+
+
 # --- review flow ----------------------------------------------------------
 
 def test_review_page_lists_suggestion_with_warnings(client, auth, stub_fetch):

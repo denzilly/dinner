@@ -13,6 +13,11 @@ from flask import g
 import db
 from app import grocery, parse
 
+# Mirrors `recipes.servings INTEGER NOT NULL DEFAULT 4` in 001_initial.sql. The
+# column default never fires because save_recipe always names the column, so the
+# fallback has to live here too or a missing yield is an IntegrityError.
+DEFAULT_SERVINGS = 4
+
 
 def get_db() -> sqlite3.Connection:
     """Per-request connection, closed by the teardown handler in __init__."""
@@ -265,6 +270,13 @@ def save_recipe(
     conn = get_db()
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
     warnings_json = json.dumps(extraction_warnings) if extraction_warnings else None
+
+    # A recipe with no stated yield is normal, not an error: plenty of sites omit
+    # recipeYield, and the add form lets the field be left blank. Assume the
+    # schema's default rather than rejecting an otherwise fine recipe -- grocery
+    # scaling needs *some* number, and a wrong-but-editable 4 beats a 500.
+    if servings is None:
+        servings = DEFAULT_SERVINGS
 
     if recipe_id is None:
         cursor = conn.execute(

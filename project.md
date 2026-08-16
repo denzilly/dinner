@@ -442,6 +442,19 @@ indefinitely on its own.
   place a silent bug is both likely and expensive. **Already covered** —
   `tests/test_grocery.py` had ~25 tests over exactly this before phase 4
   started; nothing further was needed.
+- **Missing servings 500'd on save** — spotted during phase 4, fixed after.
+  `recipes.servings` is `NOT NULL DEFAULT 4`, but `save_recipe` always names
+  the column, so the column default never fired and a `None` reached SQLite as
+  an `IntegrityError`. It hit all three write paths, not just the manual API
+  payload it was first noticed on: URL ingest of any page without a parseable
+  `recipeYield`, and the webapp's own add/edit form with the field left blank.
+  Fixed at the single choke point (`queries.DEFAULT_SERVINGS`) rather than at
+  each caller. A missing yield is ordinary input — plenty of sites omit it —
+  so it defaults rather than 4xx'ing: rejecting would make URL ingest hostage
+  to the source site's markup, and grocery scaling needs *some* number. The
+  whole suite missed it because every existing ingest test passed an explicit
+  `servings`; the three regression tests in `test_ingest.py` cover one path
+  each.
 
 ### Phase 5 — Weekly discovery sweep (later, to be specified)
 
