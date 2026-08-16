@@ -425,13 +425,24 @@ indefinitely on its own.
 
 ### Phase 4 — Hardening (in progress, 2026-08-16)
 
-- `data/dinner.db` added to the server's backup sweep — **still open**. There
-  is no backup process anywhere on `bartserver` yet (confirmed: empty
-  crontab besides `research_aggregator`'s ingestion job, nothing in
-  `/etc/cron.d`), so this stays a host-wide gap rather than something
-  dinner-specific to solve alone — see `infra/SERVICES.md`'s "Backups"
-  section. `backup.py` (below) is a usable manual stopgap in the meantime:
+- `data/dinner.db` added to the server's backup sweep — **written, not yet
+  installed**. There was no backup process anywhere on `bartserver`, so this
+  was always a host-wide gap rather than something dinner-specific to solve
+  alone. It's now solved host-wide rather than per-project: `infra/backup/`
+  holds a nightly restic backup to the NAS over SFTP, with an optional
+  off-site copy, systemd user timers, weekly integrity checks and a documented
+  restore drill. See `infra/backup/README.md`. The setup steps still need
+  running — until then `backup.py dump` remains the manual stopgap:
   `python backup.py dump | ssh host 'cat > dinner-$(date +%F).json'`.
+
+  Two things about `dinner` shaped that design. `data/dinner.db` is WAL-mode,
+  so a file-level copy can capture a torn state that restores minus its most
+  recent writes — the backup snapshots it through sqlite3's online backup API
+  and excludes the live file. And `backup.py load` replaces the database
+  wholesale, which is exactly the accident that makes a versionless `rsync`
+  mirror unsafe: it would copy the damage over the last good copy. `backup.py
+  dump` also runs nightly into the same snapshot, because JSON survives a
+  SQLite version change or a corrupt page and the `.db` snapshot doesn't.
 - Seed/export: a JSON dump-and-load script, so the recipe bank isn't hostage
   to one SQLite file. **Built** — `backup.py` (`python backup.py dump|load`),
   covers every table but the derived FTS index and migration bookkeeping.
