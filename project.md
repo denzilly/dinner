@@ -497,7 +497,18 @@ indefinitely on its own.
   filters to `status='active'` — so this is about the reviewer not accepting
   blind, not about blocking ingest.
 
-### Phase 5 — Weekly discovery sweep (later, to be specified)
+### Phase 5 — Weekly discovery sweep (deferred to v2, 2026-08-16)
+
+**Moved to the end, after Picnic.** Phase 6 is the one with real uncertainty in
+it — an unofficial API that can break on any Picnic release — so it gets built
+while there's appetite to deal with that, and the sweep lands last as part of
+v2. Numbering is kept as-is rather than swapped, because several notes above
+and in the code refer to "the phase-5 path" and "phase 6" by number.
+
+Nothing about this ordering changes the design below: the sweep still posts
+through the phase-1 ingest path, which is already built and now normalises
+hand-built payloads too (see the ingest note under phase 4 — that fix was made
+partly *because* an unattended poster will eventually use it).
 
 **Deliberately not designed yet** — to be worked out in more detail before
 building. Sketch only, so phases 0–4 don't paint it into a corner:
@@ -519,7 +530,7 @@ Open for that phase: which sites, how preferences get expressed and edited,
 how aggressively to filter, and whether "seen and rejected" should feed back
 into scoring.
 
-### Phase 6 — Picnic (later, and genuinely uncertain)
+### Phase 6 — Picnic (in progress, 2026-08-16 — spike first)
 
 Picnic has no official public API. Every client below is reverse-engineered
 from the mobile app's endpoints and can break whenever Picnic ships an update.
