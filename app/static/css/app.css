@@ -1,29 +1,87 @@
-/* Dinner -- phase 0 shell.
+/* Dinner -- "Botanical Culinary System".
+   Palette, type scale and spacing come from the Stitch design of the same
+   name; the old terracotta tokens keep their names so every page that was
+   never redrawn still lands somewhere sensible.
+
    Light and dark both defined via tokens; the board collapses to a single
    column on phones, which is where the grocery list will get used most. */
 
 :root {
-  --bg: #faf7f2;
+  /* Surfaces */
+  --bg: #f6faf7;
   --surface: #ffffff;
-  --border: #e6ded2;
-  --text: #23201c;
-  --muted: #7c7266;
-  --accent: #b4531f;
-  --accent-soft: #fbeee4;
-  --radius: 10px;
-  --shadow: 0 1px 2px rgba(35, 32, 28, 0.06);
+  --surface-low: #f1f5f2;
+  --surface-container: #ebefec;
+  --surface-high: #e5e9e6;
+  --surface-variant: #dfe3e1;
+  --mint: #e5ebe6;
+
+  /* Ink */
+  --text: #181d1b;
+  --muted: #424843;
+  --outline: #727973;
+  --border: #c2c8c2;
+
+  /* Greens */
+  --accent: #00150a;            /* primary */
+  --accent-hover: #0d2b1d;      /* primary-container */
+  --accent-soft: #d0e9d3;       /* tertiary-fixed */
+  --accent-soft-dim: #b4cdb7;
+  --on-accent-soft: #364c3b;
+  --secondary: #45664f;
+  --secondary-container: #c6eccf;
+  --on-secondary-container: #2d4e38;
+  --tint: #476554;
+
+  /* Accents borrowed for the "skip"/warn affordances */
+  --amber: #fdf0d5;
+  --amber-ink: #6b4a05;
+  --danger: #932020;
+
+  --radius: 8px;      /* rounded-xl in the design */
+  --radius-sm: 4px;
+  --radius-pill: 12px;
+  --shadow: 0 1px 2px rgba(45, 79, 60, 0.05);
+  --shadow-lift: 0 8px 24px rgba(45, 79, 60, 0.08);
+
+  --font-body: "Work Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-head: "Manrope", "Work Sans", system-ui, sans-serif;
+  --font-label: "JetBrains Mono", ui-monospace, "Cascadia Mono", monospace;
 }
 
 @media (prefers-color-scheme: dark) {
+  /* The Stitch design is light-only. This is the same palette rotated into
+     the dark end of the ramp so the page stays usable, not a second design. */
   :root {
-    --bg: #171512;
-    --surface: #201d19;
-    --border: #332e28;
-    --text: #ece6dd;
-    --muted: #9a9086;
-    --accent: #e08a52;
-    --accent-soft: #2b231c;
+    --bg: #101512;
+    --surface: #171d19;
+    --surface-low: #1b221e;
+    --surface-container: #202823;
+    --surface-high: #263029;
+    --surface-variant: #2c352f;
+    --mint: #0d1310;
+
+    --text: #dfe4e0;
+    --muted: #a8b2ab;
+    --outline: #7d877f;
+    --border: #333d36;
+
+    --accent: #adceb9;
+    --accent-hover: #c9ebd5;
+    --accent-soft: #23392b;
+    --accent-soft-dim: #2e4735;
+    --on-accent-soft: #c9ebd5;
+    --secondary: #9dc0a7;
+    --secondary-container: #2d4e38;
+    --on-secondary-container: #c6eccf;
+    --tint: #8fb69d;
+
+    --amber: #3a2f14;
+    --amber-ink: #f0d9a2;
+    --danger: #ef9a9a;
+
     --shadow: none;
+    --shadow-lift: none;
   }
 }
 
@@ -33,32 +91,59 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  font: 400 16px/1.5 var(--font-body);
+  -webkit-font-smoothing: antialiased;
 }
 
+/* The planner sits on the design's mint ground so its white day cards lift
+   off the page; every other view keeps the lighter default surface. */
+body.page-plan { background: var(--mint); }
+
 main {
-  max-width: 1100px;
+  max-width: 1280px;
   margin: 0 auto;
-  padding: 1.5rem 1rem 3rem;
+  padding: 2rem 1rem 4rem;
+}
+
+@media (min-width: 768px) {
+  main { padding: 2rem 2.5rem 4rem; }
+}
+
+.icon {
+  flex: none;
+  vertical-align: -0.15em;
 }
 
 /* Header */
 
 .site-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.site-header__inner {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 1rem;
-  padding: 0.9rem 1rem;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
+  height: 64px;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+@media (min-width: 768px) {
+  .site-header__inner { padding: 0 2.5rem; }
 }
 
 .brand {
-  font-weight: 650;
-  font-size: 1.05rem;
-  letter-spacing: -0.01em;
-  color: var(--text);
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 24px;
+  line-height: 32px;
+  color: var(--accent);
   text-decoration: none;
 }
 
@@ -67,11 +152,14 @@ main {
   border: 0;
   padding: 0;
   font: inherit;
-  color: var(--muted);
+  font-family: var(--font-label);
+  font-size: 12px;
+  color: var(--secondary);
+  text-decoration: none;
   cursor: pointer;
 }
 
-.link-button:hover { color: var(--accent); }
+.link-button:hover { color: var(--accent); text-decoration: underline; }
 
 /* Week navigation */
 
@@ -80,30 +168,53 @@ main {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  margin-bottom: 1.25rem;
+  margin-bottom: 0.5rem;
 }
 
 .week-nav__label { text-align: center; }
 
 .week-nav h1 {
   margin: 0;
-  font-size: 1.3rem;
+  font-family: var(--font-head);
+  font-size: 28px;
+  line-height: 36px;
   font-weight: 600;
-  letter-spacing: -0.015em;
+  letter-spacing: 0;
+  color: var(--accent);
+}
+
+@media (min-width: 768px) {
+  .week-nav h1 { font-size: 32px; line-height: 40px; }
 }
 
 .week-nav__step,
 .week-nav__today {
-  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--secondary);
   text-decoration: none;
-  font-size: 0.9rem;
+  font-family: var(--font-label);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
   white-space: nowrap;
+  transition: color 0.15s;
 }
 
 .week-nav__step:hover,
 .week-nav__today:hover { color: var(--accent); }
 
-.week-nav__today { display: inline-block; margin-top: 0.15rem; }
+/* Arrows lean toward the direction they take you, as in the design. */
+.week-nav__step[rel="prev"]:hover .icon { transform: translateX(-3px); }
+.week-nav__step[rel="next"]:hover .icon { transform: translateX(3px); }
+.week-nav__step .icon { transition: transform 0.15s; }
+
+.week-nav__today {
+  margin-top: 0.15rem;
+  letter-spacing: 0;
+  font-family: var(--font-body);
+}
 
 /* The board */
 
@@ -112,12 +223,19 @@ main {
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 0.75rem;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 1.5rem;
+}
+
+/* The design is a 1280px desktop layout. Holding five columns below that
+   squeezes a card to ~187px, which is narrower than "Wednesday" plus its date
+   and lock -- so step down to three before anything has to overflow. */
+@media (max-width: 1250px) {
+  .board { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 @media (max-width: 860px) {
-  .board { grid-template-columns: repeat(2, 1fr); }
+  .board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 520px) {
@@ -125,111 +243,228 @@ main {
 }
 
 .day {
+  position: relative;
   display: flex;
   flex-direction: column;
-  min-height: 8.5rem;
+  gap: 1rem;
+  min-height: 21.5rem;
+  padding: 1rem;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  transition: box-shadow 0.2s;
+}
+
+.day:hover { box-shadow: var(--shadow-lift); }
+
+/* Today is the design's focused card: a heavier green edge plus the rule
+   across the top. */
+.day--today {
+  border: 2px solid var(--accent-hover);
+  padding: calc(1rem - 1px);
   box-shadow: var(--shadow);
   overflow: hidden;
 }
 
-.day--today { border-color: var(--accent); }
+.day--today::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 4px;
+  background: var(--accent-hover);
+}
 
 .day__header {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.5rem;
-  padding: 0.6rem 0.75rem;
-  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--surface-variant);
 }
 
-.day--today .day__header { background: var(--accent-soft); }
+/* The date stays with the weekday; the lock is pushed out to the card's
+   top-right corner. */
+.day__header form { display: flex; margin-left: auto; }
 
-.day__weekday { font-weight: 600; font-size: 0.9rem; }
+.day__weekday {
+  margin: 0;
+  font-family: var(--font-head);
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 600;
+  color: var(--accent);
+}
 
-.day__date { color: var(--muted); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+.day__date {
+  color: var(--outline);
+  font-family: var(--font-label);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
 
 .day__body {
   flex: 1;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 0.75rem;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
 }
 
 .day__recipe {
   display: block;
-  font-weight: 550;
+  font-weight: 500;
   color: var(--text);
   text-decoration: none;
-  line-height: 1.3;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
-.day__recipe:hover { color: var(--accent); }
+.day__recipe:hover { color: var(--tint); }
 
-.day__stats { margin: 0.3rem 0 0; color: var(--muted); font-size: 0.78rem; }
+.day__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.75rem;
+  margin: 0;
+  color: var(--secondary);
+  font-family: var(--font-label);
+  font-size: 12px;
+}
 
-.day__empty { margin: 0; color: var(--muted); font-size: 0.9rem; }
+.day__stats span { display: inline-flex; align-items: center; gap: 0.25rem; }
 
-.day__note { margin: 0.4rem 0 0; color: var(--muted); font-size: 0.8rem; font-style: italic; }
+.day__empty { margin: 0; color: var(--muted); font-size: 0.95rem; }
+
+.day__note { margin: 0; color: var(--muted); font-size: 0.8rem; font-style: italic; }
 
 /* Day actions */
 
+/* One row of equal-width pills, as in the design. The lock is icon-only and
+   opts out of the stretch so the three worded actions keep their share.
+
+   The row wraps rather than shrinking: pills keep their intrinsic width, so a
+   narrow track pushes the third pill onto a second line instead of squeezing
+   the labels out past the card edge. */
 .day__actions {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: stretch;
   gap: 0.25rem;
-  padding: 0 0.5rem 0.5rem;
+  margin-top: auto;
 }
 
-.day__actions form { display: inline; }
+.day__actions form { display: flex; flex: 1 1 auto; }
 
 .day__action {
-  padding: 0.2rem 0.45rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg);
+  flex: 1 1 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem 0.4rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  background: var(--surface-low);
   color: var(--muted);
-  font: inherit;
-  font-size: 0.78rem;
+  font-family: var(--font-label);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  text-align: center;
   text-decoration: none;
   cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
 }
 
-.day__action:hover { border-color: var(--accent); color: var(--accent); }
+.day__action--primary {
+  background: var(--accent);
+  color: var(--surface);
+}
 
-.day__action.is-on { border-color: var(--accent); background: var(--accent-soft); }
+.day__action--primary:hover { background: var(--accent-hover); }
 
-.day__details { padding: 0 0.5rem 0.5rem; }
+.day__action--secondary {
+  background: var(--secondary-container);
+  color: var(--on-secondary-container);
+}
+
+.day__action--secondary:hover { background: var(--accent-soft); }
+
+.day__action--skip {
+  background: var(--amber);
+  color: var(--amber-ink);
+}
+
+.day__action--skip:hover { filter: brightness(0.96); }
+
+.day__action--quiet {
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.day__action--quiet:hover { border-color: var(--secondary); color: var(--accent); }
+
+.day__lock {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--outline);
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.day__lock:hover { border-color: var(--secondary); color: var(--accent); }
+
+.day__lock.is-on {
+  border-color: var(--accent-soft-dim);
+  background: var(--accent-soft);
+  color: var(--on-accent-soft);
+}
+
+.day__details { margin-top: 0.5rem; }
 
 .day__details summary {
-  color: var(--muted);
-  font-size: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  width: max-content;
+  color: var(--secondary);
+  font-family: var(--font-label);
+  font-size: 12px;
   cursor: pointer;
   list-style: none;
 }
 
 .day__details summary::-webkit-details-marker { display: none; }
 
-.day__details summary:hover { color: var(--accent); }
+.day__details summary:hover { color: var(--accent); text-decoration: underline; }
 
-.day__details form { display: grid; gap: 0.3rem; margin-top: 0.4rem; }
+/* The note field's default intrinsic width is wider than a day card, so the
+   grid tracks are pinned to zero and every control told to fit them. */
+.day__details form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
 
 .day__details label { display: flex; align-items: center; gap: 0.3rem; font-size: 0.78rem; color: var(--muted); }
 
-.day__details input[type="number"] { width: 4rem; }
+.day__details input { width: 100%; min-width: 0; font-size: 0.82rem; padding: 0.3rem 0.4rem; }
 
-.day__details input { font-size: 0.82rem; padding: 0.3rem 0.4rem; }
+.day__details input[type="number"] { width: 4rem; flex: none; }
 
-.day--locked .day__header { background: var(--accent-soft); }
+.day--locked { border-color: var(--accent-soft-dim); }
 
 /* Week-level actions */
 
-.week-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
+.week-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0 0 2rem; }
 
 /* Choose page */
 
@@ -401,15 +636,50 @@ main {
 
 /* Nav */
 
-.site-nav { display: flex; gap: 1rem; margin-right: auto; margin-left: 1.5rem; }
+/* The design drops the nav behind a menu button on narrow screens. The
+   grocery list is the one view that really gets used on a phone, so the links
+   stay put and the row scrolls sideways instead of overflowing the page. */
+.site-nav {
+  display: flex;
+  gap: 0.5rem;
+  margin-right: auto;
+  margin-left: 1.5rem;
+  height: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.site-nav::-webkit-scrollbar { display: none; }
+
+@media (max-width: 520px) {
+  .site-nav { margin-left: 0.75rem; gap: 0.25rem; }
+  .site-nav a { padding: 0 0.35rem; letter-spacing: 0.02em; }
+}
 
 .site-nav a {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0 0.5rem;
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
   color: var(--muted);
   text-decoration: none;
-  font-size: 0.9rem;
+  font-family: var(--font-label);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  transition: color 0.15s;
 }
 
 .site-nav a:hover { color: var(--accent); }
+
+.site-nav a.is-current {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
 
 .badge {
   display: inline-block;
@@ -417,8 +687,9 @@ main {
   padding: 0 0.3rem;
   border-radius: 999px;
   background: var(--accent);
-  color: #fff;
+  color: var(--bg);
   font-size: 0.72rem;
+  letter-spacing: 0;
   text-align: center;
   line-height: 1.35;
 }
@@ -436,54 +707,120 @@ main {
   font-size: 0.9rem;
 }
 
-.flash--success { border-left-color: #4a7c59; }
-.flash--error { border-left-color: #b4531f; }
-.flash--info { border-left-color: var(--muted); }
+.flash--success { border-left-color: var(--secondary); }
+.flash--error { border-left-color: var(--danger); }
+.flash--info { border-left-color: var(--outline); }
 
 /* Shared bits */
 
 .page-head {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: flex-start;
   gap: 1rem;
-  margin-bottom: 1rem;
+  margin-bottom: 2rem;
 }
 
-.page-head h1, h1 { font-size: 1.3rem; font-weight: 600; letter-spacing: -0.015em; margin: 0 0 1rem; }
+@media (min-width: 768px) {
+  .page-head {
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: space-between;
+  }
+}
+
+h1 {
+  font-family: var(--font-head);
+  font-size: 1.75rem;
+  line-height: 1.25;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0 0 1rem;
+}
 
 .page-head h1 { margin: 0; }
 
-h2 { font-size: 1rem; font-weight: 600; margin: 1.5rem 0 0.5rem; }
-
-.button {
-  display: inline-block;
-  padding: 0.45rem 0.8rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  color: var(--text);
-  font: inherit;
-  font-size: 0.9rem;
-  text-decoration: none;
-  cursor: pointer;
+/* The design's display size, reserved for the page a section is named after. */
+.page-title {
+  font-size: 40px;
+  line-height: 48px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--accent);
+  margin: 0 0 0.5rem;
 }
 
-.button--primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+@media (min-width: 768px) {
+  .page-title { font-size: 48px; line-height: 56px; }
+}
+
+.page-subtitle {
+  margin: 0;
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 28px;
+}
+
+h2 {
+  font-family: var(--font-head);
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 1.5rem 0 0.5rem;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.7rem 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-label);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.button:hover { background: var(--surface-high); }
+
+.button--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--surface);
+}
+
+.button--primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
 
 .empty-state { color: var(--muted); padding: 2rem 0; }
 
-.empty-state a, .result-count a { color: var(--accent); }
+.empty-state a, .result-count a { color: var(--secondary); }
 
-.result-count { color: var(--muted); font-size: 0.85rem; margin: 0 0 0.5rem; }
+.result-count {
+  color: var(--muted);
+  font-family: var(--font-label);
+  font-size: 14px;
+  letter-spacing: 0.05em;
+  margin: 0 0 1rem;
+}
 
 input, textarea, select {
   font: inherit;
   color: var(--text);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0.45rem 0.55rem;
+  border-radius: var(--radius-sm);
+  padding: 0.65rem 0.75rem;
+}
+
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--secondary);
+  box-shadow: 0 0 0 1px var(--secondary);
 }
 
 textarea { width: 100%; resize: vertical; }
@@ -587,35 +924,188 @@ button { cursor: pointer; }
 
 /* Chips and filters */
 
-.filters { margin-bottom: 1.25rem; display: grid; gap: 0.6rem; }
+/* The design puts search, sort and the active tags in one raised panel. */
+.filters {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 2rem;
+  padding: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
 
-.filters__row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.filters__row { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; }
 
-.filters__row input[type="search"] { flex: 1; min-width: 12rem; }
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
 
-.filters__tags { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; }
+/* Filter dropdown ---------------------------------------------------------
+   The design's row is search + sort + one Filter button, so the tag bank and
+   the time limit hang off that button instead of sitting in the row. */
+
+.filter-menu { position: relative; flex: none; }
+
+.filter-menu > summary {
+  list-style: none;
+  user-select: none;
+}
+
+.filter-menu > summary::-webkit-details-marker { display: none; }
+
+.filter-menu > summary.is-on {
+  border-color: var(--secondary);
+  background: var(--accent-soft);
+  color: var(--on-accent-soft);
+}
+
+.filter-menu__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.1rem;
+  height: 1.1rem;
+  padding: 0 0.25rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--surface);
+  font-size: 11px;
+  letter-spacing: 0;
+}
+
+.filter-menu__panel {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  width: min(22rem, calc(100vw - 3rem));
+  display: grid;
+  gap: 0.9rem;
+  padding: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 32px rgba(45, 79, 60, 0.14);
+}
+
+/* A popover anchored to the button is wider than a phone, so below this width
+   the panel drops inline and pushes the list down instead. */
+@media (max-width: 640px) {
+  .filter-menu { flex: 1 1 100%; }
+  .filter-menu > summary { width: 100%; justify-content: center; }
+  .filter-menu__panel {
+    position: static;
+    width: auto;
+    margin-top: 0.5rem;
+    box-shadow: none;
+  }
+}
+
+.filter-menu__time {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.filter-menu__group { display: grid; gap: 0.4rem; }
+
+.filter-menu__empty { margin: 0; color: var(--muted); font-size: 0.85rem; }
+
+.filter-menu__panel .button { justify-self: start; }
+
+/* Active filter chips ------------------------------------------------------ */
+
+.filters__active {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.filters__active-label {
+  color: var(--muted);
+  font-family: var(--font-label);
+  font-size: 12px;
+  margin-right: 0.25rem;
+}
+
+.chip--active {
+  border-color: var(--accent-soft-dim);
+  background: var(--accent-soft);
+  color: var(--on-accent-soft);
+  text-decoration: none;
+}
+
+.chip--active:hover { background: var(--accent-soft-dim); }
+
+.chip--active .icon { opacity: 0.7; }
+
+.search-field { position: relative; flex: 1; min-width: 14rem; display: flex; }
+
+.search-field .icon {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--outline);
+  pointer-events: none;
+}
+
+.search-field input[type="search"] {
+  flex: 1;
+  min-width: 0;
+  padding-left: 3rem;
+}
+
+.filters__row select { min-width: 13rem; flex: none; cursor: pointer; }
+
+.filters__tags { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
 
 .filters__kind {
   color: var(--muted);
-  font-size: 0.75rem;
+  font-family: var(--font-label);
+  font-size: 12px;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   min-width: 4.5rem;
 }
 
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
-  padding: 0.2rem 0.55rem;
+  gap: 0.35rem;
+  padding: 0.25rem 0.75rem;
   border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--surface);
-  font-size: 0.85rem;
+  border-radius: var(--radius-pill);
+  background: var(--surface-low);
+  color: var(--muted);
+  font-family: var(--font-label);
+  font-size: 12px;
+  line-height: 16px;
   cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
 }
 
-.chip--on { border-color: var(--accent); background: var(--accent-soft); }
+.chip:hover { border-color: var(--secondary); }
+
+.chip--on {
+  border-color: var(--accent-soft-dim);
+  background: var(--accent-soft);
+  color: var(--on-accent-soft);
+}
 
 .chip--static { cursor: default; }
 
@@ -640,27 +1130,87 @@ button { cursor: pointer; }
 
 /* Recipe list */
 
-.recipe-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
+.recipe-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 1rem; }
 
-.recipe-list a {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.5rem;
-  padding: 0.7rem 0.85rem;
+.recipe-card {
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--accent-soft);
   border-radius: var(--radius);
+  overflow: hidden;
+  transition: box-shadow 0.3s;
+}
+
+.recipe-card:hover { box-shadow: var(--shadow-lift); }
+
+.recipe-card a {
+  display: flex;
+  align-items: stretch;
   color: var(--text);
   text-decoration: none;
 }
 
-.recipe-list a:hover { border-color: var(--accent); }
+/* The design fronts every row with a photo. Nothing populates image_path yet,
+   so the slot falls back to a sage tile rather than collapsing -- the row keeps
+   its proportions either way. */
+.recipe-card__thumb {
+  flex: none;
+  width: 8rem;
+  min-height: 8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-soft);
+  color: var(--on-accent-soft);
+}
 
-.recipe-list__title { font-weight: 550; }
+.recipe-card__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
 
-.recipe-list__meta { color: var(--muted); font-size: 0.83rem; }
+.recipe-card__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  min-width: 0;
+}
+
+.recipe-card__title {
+  margin: 0;
+  font-family: var(--font-head);
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 600;
+  color: var(--accent);
+  transition: color 0.15s;
+}
+
+.recipe-card a:hover .recipe-card__title { color: var(--tint); }
+
+.recipe-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 1rem;
+  color: var(--secondary);
+  font-family: var(--font-label);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.recipe-card__meta span { display: inline-flex; align-items: center; gap: 0.3rem; }
+
+.recipe-card__source { color: var(--muted); margin-left: auto; }
+
+@media (max-width: 640px) {
+  .recipe-card a { flex-direction: column; }
+  .recipe-card__thumb { width: 100%; height: 9rem; }
+  .recipe-card__source { margin-left: 0; }
+}
 
 /* Forms */
 
@@ -689,6 +1239,17 @@ button { cursor: pointer; }
 }
 
 .new-tag label { font-size: 0.85rem; color: var(--muted); }
+
+.recipe-hero {
+  display: block;
+  width: 100%;
+  max-width: 44rem;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  margin: 1.25rem 0;
+  border: 1px solid var(--accent-soft);
+  border-radius: var(--radius);
+}
 
 .recipe-body section { margin-bottom: 1.5rem; }
 

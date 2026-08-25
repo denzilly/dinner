@@ -19,7 +19,7 @@ import hmac
 from flask import Blueprint, jsonify, request, url_for
 
 import config
-from app import extract, parse, queries
+from app import extract, images, parse, queries
 
 bp = Blueprint("api", __name__, url_prefix="/api")
 
@@ -102,6 +102,12 @@ def _ingest_payload(payload: dict) -> tuple[dict, int]:
             "set the real one before accepting"
         )
 
+    # Fetched after the recipe has passed validation, so a broken photo URL
+    # never costs us a download on a payload we were going to reject anyway.
+    image_path, image_warning = images.download_quietly(extracted.image_url)
+    if image_warning:
+        extracted.warnings.append(image_warning)
+
     warnings = [{"line": None, "warnings": extracted.warnings}] if extracted.warnings else []
     warnings += [
         {"line": item.raw, "warnings": item.warnings}
@@ -119,6 +125,7 @@ def _ingest_payload(payload: dict) -> tuple[dict, int]:
         servings=extracted.servings,
         prep_minutes=extracted.prep_minutes,
         cook_minutes=extracted.cook_minutes,
+        image_path=image_path,
         status="suggested",
         extraction=extracted.extraction,
         extraction_warnings={

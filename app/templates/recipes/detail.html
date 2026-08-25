@@ -24,6 +24,11 @@
   </p>
 {% endif %}
 
+{% if recipe.image_path %}
+  <img class="recipe-hero" src="{{ url_for('recipes.image', name=recipe.image_path) }}"
+       alt="{{ recipe.title }}">
+{% endif %}
+
 <div class="recipe-body">
   <section>
     <h2>Ingredients</h2>

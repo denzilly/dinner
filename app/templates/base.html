@@ -4,26 +4,37 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Dinner{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700&family=Work+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
 </head>
-<body>
+<body class="{% block body_class %}{% endblock %}">
+  {% set nav_here = request.endpoint or '' %}
   <header class="site-header">
-    <a class="brand" href="{{ url_for('plan.week') }}">Dinner</a>
-    <nav class="site-nav">
-      <a href="{{ url_for('plan.week') }}">Week</a>
-      <a href="{{ url_for('recipes.index') }}">Recipes</a>
-      <a href="{{ url_for('grocery.show') }}">Groceries</a>
-      <a href="{{ url_for('recipes.review') }}">
-        Review
-        {% set pending = pending_reviews() %}
-        {% if pending %}<span class="badge">{{ pending }}</span>{% endif %}
-      </a>
-    </nav>
-    {% if password_gate_enabled and session.get('authenticated') %}
-      <form method="post" action="{{ url_for('auth.logout') }}">
-        <button type="submit" class="link-button">Log out</button>
-      </form>
-    {% endif %}
+    <div class="site-header__inner">
+      <a class="brand" href="{{ url_for('plan.week') }}">Dinner</a>
+      <nav class="site-nav">
+        <a href="{{ url_for('plan.week') }}"
+           class="{{ 'is-current' if nav_here.startswith('plan.') }}">Week</a>
+        <a href="{{ url_for('recipes.index') }}"
+           class="{{ 'is-current' if nav_here.startswith('recipes.') and nav_here != 'recipes.review' }}">Recipes</a>
+        <a href="{{ url_for('grocery.show') }}"
+           class="{{ 'is-current' if nav_here.startswith('grocery.') }}">Groceries</a>
+        <a href="{{ url_for('recipes.review') }}"
+           class="{{ 'is-current' if nav_here == 'recipes.review' }}">
+          Review
+          {% set pending = pending_reviews() %}
+          {% if pending %}<span class="badge">{{ pending }}</span>{% endif %}
+        </a>
+      </nav>
+      {% if password_gate_enabled and session.get('authenticated') %}
+        <form method="post" action="{{ url_for('auth.logout') }}">
+          <button type="submit" class="link-button">Log out</button>
+        </form>
+      {% endif %}
+    </div>
   </header>
 
   <main>

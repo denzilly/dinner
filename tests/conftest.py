@@ -19,6 +19,8 @@ import db as db_module  # noqa: E402
 @pytest.fixture
 def app(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "DATABASE_PATH", str(tmp_path / "test.db"))
+    # Without this, a test that stores a photo writes into the real data/images.
+    monkeypatch.setattr(config, "IMAGE_DIR", str(tmp_path / "images"))
     monkeypatch.setattr(config, "INGEST_TOKEN", "test-token")
     monkeypatch.setattr(config, "SITE_PASSWORD", None)
     monkeypatch.setattr(config, "SECRET_KEY", "test-secret")

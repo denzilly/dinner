@@ -28,6 +28,10 @@ def _env(key: str, default: str | None = None) -> str | None:
 # mounted to ./data on the host.
 DATABASE_PATH = _env("DATABASE_PATH", str(BASE_DIR / "data" / "dinner.db"))
 
+# Downloaded recipe photos. Kept beside the database so the existing data/ bind
+# mount covers them too -- no second volume to remember on deploy.
+IMAGE_DIR = _env("IMAGE_DIR", str(BASE_DIR / "data" / "images"))
+
 MIGRATIONS_DIR = BASE_DIR / "db" / "migrations"
 
 # Signs the session cookie. Required whenever SITE_PASSWORD is set.

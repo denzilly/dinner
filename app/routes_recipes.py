@@ -2,9 +2,9 @@
 import json
 
 from flask import (Blueprint, abort, flash, redirect, render_template, request,
-                   url_for)
+                   send_from_directory, url_for)
 
-from app import parse, queries
+from app import images, parse, queries
 from app.routes_api import _ingest_payload
 
 bp = Blueprint("recipes", __name__, url_prefix="/recipes")
@@ -59,11 +59,17 @@ def index():
     for tag in queries.tags_with_counts():
         tags_by_kind.setdefault(tag["kind"], []).append(tag)
 
+    # The "Active Tags" row needs names, not just the ids from the query string.
+    active_tag_rows = [
+        tag for tags in tags_by_kind.values() for tag in tags if tag["id"] in tag_ids
+    ]
+
     return render_template(
         "recipes/index.html",
         recipes=recipes,
         query=query,
         active_tags=tag_ids,
+        active_tag_rows=active_tag_rows,
         tags_by_kind=tags_by_kind,
         max_minutes=max_minutes,
         sort=sort,
@@ -172,6 +178,20 @@ def archive(recipe_id):
     return redirect(url_for("recipes.index"))
 
 
+@bp.get("/images/<name>")
+def image(name):
+    """Serve a stored recipe photo.
+
+    The name is checked against the exact shape images.store() produces before
+    it reaches the filesystem. send_from_directory already refuses traversal,
+    but this route hands out whatever is in the image directory, so the guard
+    is stated here rather than inherited.
+    """
+    if not images.is_safe_name(name):
+        abort(404)
+    return send_from_directory(images.image_dir(), name, max_age=60 * 60 * 24 * 365)
+
+
 @bp.get("/<int:recipe_id>")
 def detail(recipe_id):
     recipe = queries.get_recipe(recipe_id)
@@ -213,6 +233,11 @@ def edit(recipe_id=None):
                 servings=request.form.get("servings", type=int),
                 prep_minutes=request.form.get("prep_minutes", type=int),
                 cook_minutes=request.form.get("cook_minutes", type=int),
+                # save_recipe rewrites every column, so anything the form does
+                # not collect has to be carried over explicitly or the edit
+                # silently blanks it.
+                source_name=recipe["source_name"] if recipe else None,
+                image_path=recipe["image_path"] if recipe else None,
                 status=recipe["status"] if recipe else "active",
                 extraction=recipe["extraction"] if recipe else "manual",
             )

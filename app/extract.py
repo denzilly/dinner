@@ -27,7 +27,16 @@ from bs4 import BeautifulSoup
 USER_AGENT = "dinner/0.1 (personal meal planner; +https://dinner.btblog.dev)"
 TIMEOUT_SECONDS = 20
 MAX_BYTES = 4 * 1024 * 1024
+MAX_IMAGE_BYTES = 8 * 1024 * 1024
 MAX_REDIRECTS = 5
+
+
+@dataclass
+class _RawResponse:
+    url: str
+    content: bytes
+    content_type: str
+    encoding: str
 
 
 class FetchError(Exception):
@@ -89,12 +98,13 @@ def _validate_url(url: str) -> str:
     return urlunparse(parsed)
 
 
-def fetch(url: str) -> tuple[str, str]:
-    """Return (final_url, html).
+def _fetch_raw(url: str, accept: str, max_bytes: int, too_large: str) -> _RawResponse:
+    """Fetch `url` as bytes, following redirects by hand.
 
-    Redirects are followed by hand so every hop is re-validated -- a public URL
-    that 302s to 169.254.169.254 is the classic way to turn a URL-fetching
-    feature into a way to read the host's metadata service.
+    Every hop is re-validated -- a public URL that 302s to 169.254.169.254 is
+    the classic way to turn a URL-fetching feature into a way to read the
+    host's metadata service. Images go through this same path as pages, so the
+    guard cannot be bypassed by pointing an <img> at an internal address.
     """
     current = _validate_url(url)
 
@@ -102,7 +112,7 @@ def fetch(url: str) -> tuple[str, str]:
         try:
             response = requests.get(
                 current,
-                headers={"User-Agent": USER_AGENT, "Accept": "text/html,*/*"},
+                headers={"User-Agent": USER_AGENT, "Accept": accept},
                 timeout=TIMEOUT_SECONDS,
                 allow_redirects=False,
                 stream=True,
@@ -131,15 +141,55 @@ def fetch(url: str) -> tuple[str, str]:
         content = b""
         for chunk in response.iter_content(64 * 1024):
             content += chunk
-            if len(content) > MAX_BYTES:
+            if len(content) > max_bytes:
                 response.close()
-                raise FetchError("That page is too large to import.")
+                raise FetchError(too_large)
         response.close()
 
-        encoding = response.encoding or "utf-8"
-        return current, content.decode(encoding, errors="replace")
+        return _RawResponse(
+            url=current,
+            content=content,
+            content_type=(response.headers.get("Content-Type") or "").split(";")[0].strip().lower(),
+            encoding=response.encoding or "utf-8",
+        )
 
     raise FetchError("Too many redirects.")
+
+
+def fetch(url: str) -> tuple[str, str]:
+    """Return (final_url, html)."""
+    raw = _fetch_raw(url, "text/html,*/*", MAX_BYTES, "That page is too large to import.")
+    return raw.url, raw.content.decode(raw.encoding, errors="replace")
+
+
+def fetch_image(url: str) -> tuple[bytes, str]:
+    """Return (bytes, extension) for a recipe photo.
+
+    The declared Content-Type is not trusted on its own -- the extension comes
+    from sniffing the magic bytes, so a page that labels HTML as image/jpeg
+    cannot get an arbitrary file written into the image directory.
+    """
+    raw = _fetch_raw(url, "image/*", MAX_IMAGE_BYTES, "That image is too large to store.")
+
+    extension = _sniff_image(raw.content)
+    if extension is None:
+        raise FetchError(
+            f"That did not look like an image (Content-Type: {raw.content_type or 'none'})."
+        )
+    return raw.content, extension
+
+
+def _sniff_image(content: bytes) -> str | None:
+    """Map a file's leading bytes to an extension, or None if unrecognised."""
+    if content.startswith(b"\xff\xd8\xff"):
+        return "jpg"
+    if content.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "png"
+    if content.startswith(b"GIF87a") or content.startswith(b"GIF89a"):
+        return "gif"
+    if content[:4] == b"RIFF" and content[8:12] == b"WEBP":
+        return "webp"
+    return None
 
 
 # --------------------------------------------------------------------------
@@ -366,6 +416,14 @@ def from_microdata(soup: BeautifulSoup, source_url: str | None = None) -> Extrac
     prep = prop("prepTime")
     cook = prop("cookTime")
 
+    # itemprop="image" is usually an <img src>, but may be a <meta content> or
+    # a <link href>, so take whichever attribute the element actually carries.
+    image_url = None
+    for node in prop("image"):
+        image_url = node.get("src") or node.get("content") or node.get("href")
+        if image_url:
+            break
+
     return ExtractedRecipe(
         title=text_of(names[0]) if names else "",
         source_url=source_url,
@@ -374,6 +432,7 @@ def from_microdata(soup: BeautifulSoup, source_url: str | None = None) -> Extrac
         servings=servings,
         prep_minutes=parse_duration_minutes(prep[0].get("datetime") if prep else None),
         cook_minutes=parse_duration_minutes(cook[0].get("datetime") if cook else None),
+        image_url=image_url,
         ingredient_lines=[text_of(node) for node in ingredients if text_of(node)],
         extraction="microdata",
         warnings=warnings,

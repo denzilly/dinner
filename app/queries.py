@@ -510,7 +510,7 @@ def search_recipes(
 ) -> list[sqlite3.Row]:
     conn = get_db()
     sql = ["SELECT r.id, r.title, r.servings, r.prep_minutes, r.cook_minutes,",
-           "       r.source_name, r.last_planned_on",
+           "       r.source_name, r.image_path, r.last_planned_on",
            "  FROM recipes r"]
     where = ["r.status = ?"]
     params: list = [status]

@@ -1,17 +1,23 @@
 {% extends "base.html" %}
+{% from "_icons.html" import icon %}
 
 {% block title %}Week of {{ monday.strftime('%d %B %Y') }} — Dinner{% endblock %}
+{% block body_class %}page-plan{% endblock %}
 
 {% block content %}
 <div class="week-nav">
-  <a class="week-nav__step" href="{{ url_for('plan.week', week=previous_week) }}" rel="prev">&larr; Previous</a>
+  <a class="week-nav__step" href="{{ url_for('plan.week', week=previous_week) }}" rel="prev">
+    {{ icon('arrow_back') }} Previous
+  </a>
   <div class="week-nav__label">
     <h1>Week of {{ monday.strftime('%d %B') }}</h1>
     {% if not is_current_week %}
       <a class="week-nav__today" href="{{ url_for('plan.week') }}">Back to this week</a>
     {% endif %}
   </div>
-  <a class="week-nav__step" href="{{ url_for('plan.week', week=next_week) }}" rel="next">Next &rarr;</a>
+  <a class="week-nav__step" href="{{ url_for('plan.week', week=next_week) }}" rel="next">
+    Next {{ icon('arrow_forward') }}
+  </a>
 </div>
 
 {% if recipe_count %}
@@ -23,7 +29,7 @@
     {% endif %}
     {% if unlocked_count %}
       <form method="post" action="{{ url_for('plan.reroll_week', monday=monday.isoformat()) }}">
-        <button type="submit" class="button">Reroll {{ unlocked_count }} unlocked</button>
+        <button type="submit" class="button">{{ icon('shuffle') }} Reroll {{ unlocked_count }} unlocked</button>
       </form>
     {% endif %}
   </div>
@@ -31,10 +37,22 @@
 
 <ol class="board">
   {% for day in board %}
-    <li class="day {% if day.is_today %}day--today{% endif %} day--{{ day.state }}">
+    <li class="day {% if day.is_today %}day--today{% endif %} day--{{ day.state }}
+               {% if day.locked %}day--locked{% endif %}">
       <div class="day__header">
-        <span class="day__weekday">{{ day.weekday }}</span>
+        <h2 class="day__weekday">{{ day.weekday }}</h2>
         <span class="day__date">{{ day.date.strftime('%d/%m') }}</span>
+        {% if day.state == 'planned' %}
+          {# The lock marks the card's state rather than acting on the recipe,
+             so it sits with the date and leaves the design's three-pill row. #}
+          <form method="post" action="{{ url_for('plan.toggle_lock', day=day.iso) }}">
+            <button type="submit" class="day__lock {{ 'is-on' if day.locked }}"
+                    aria-label="{{ 'Locked — reroll skips this day' if day.locked else 'Lock against reroll' }}"
+                    title="{{ 'Locked — reroll skips this day' if day.locked else 'Lock against reroll' }}">
+              {{ icon('lock' if day.locked else 'lock_open', 15) }}
+            </button>
+          </form>
+        {% endif %}
       </div>
 
       <div class="day__body">
@@ -43,10 +61,10 @@
             {{ day.recipe_title }}
           </a>
           {% set total = (day.prep_minutes or 0) + (day.cook_minutes or 0) %}
-          {% set stats = [] %}
-          {% if total %}{% set _ = stats.append(total ~ ' min') %}{% endif %}
-          {% if day.servings %}{% set _ = stats.append('serves ' ~ day.servings) %}{% endif %}
-          {% if stats %}<p class="day__stats">{{ stats|join(' · ') }}</p>{% endif %}
+          <p class="day__stats">
+            {% if total %}<span>{{ icon('schedule', 14) }} {{ total }} min</span>{% endif %}
+            {% if day.servings %}<span>{{ icon('restaurant', 14) }} serves {{ day.servings }}</span>{% endif %}
+          </p>
         {% elif day.state == 'skip' %}
           <p class="day__empty">Eating out</p>
         {% else %}
@@ -58,42 +76,36 @@
 
       <div class="day__actions">
         {% if day.state == 'planned' %}
-          <a class="day__action" href="{{ url_for('plan.choose', day=day.iso) }}">Change</a>
+          <a class="day__action day__action--primary" href="{{ url_for('plan.choose', day=day.iso) }}">Change</a>
           <form method="post" action="{{ url_for('plan.random_day', day=day.iso) }}">
-            <button type="submit" class="day__action">Reroll</button>
-          </form>
-          <form method="post" action="{{ url_for('plan.toggle_lock', day=day.iso) }}">
-            <button type="submit" class="day__action {{ 'is-on' if day.locked }}"
-                    title="{{ 'Locked — reroll skips this day' if day.locked else 'Lock against reroll' }}">
-              {{ '🔒' if day.locked else '🔓' }}
-            </button>
+            <button type="submit" class="day__action day__action--secondary">Reroll</button>
           </form>
           <form method="post" action="{{ url_for('plan.clear_day', day=day.iso) }}">
-            <button type="submit" class="day__action">Clear</button>
+            <button type="submit" class="day__action day__action--quiet">Clear</button>
           </form>
         {% elif day.state == 'skip' %}
           <form method="post" action="{{ url_for('plan.clear_day', day=day.iso) }}">
-            <button type="submit" class="day__action">Undo skip</button>
+            <button type="submit" class="day__action day__action--quiet">Undo skip</button>
           </form>
         {% else %}
-          <a class="day__action" href="{{ url_for('plan.choose', day=day.iso) }}">Choose</a>
+          <a class="day__action day__action--primary" href="{{ url_for('plan.choose', day=day.iso) }}">Choose</a>
           <form method="post" action="{{ url_for('plan.random_day', day=day.iso) }}">
-            <button type="submit" class="day__action">Random</button>
+            <button type="submit" class="day__action day__action--secondary">Random</button>
           </form>
           <form method="post" action="{{ url_for('plan.skip_day', day=day.iso) }}">
-            <button type="submit" class="day__action">Skip</button>
+            <button type="submit" class="day__action day__action--skip">Skip</button>
           </form>
         {% endif %}
       </div>
 
       <details class="day__details">
-        <summary>Servings &amp; note</summary>
+        <summary>{{ icon('notes', 16) }} Servings &amp; note</summary>
         <form method="post" action="{{ url_for('plan.update_details', day=day.iso) }}">
           <label>Serves
             <input type="number" name="servings" min="1" value="{{ day.servings or '' }}">
           </label>
           <input type="text" name="note" value="{{ day.note or '' }}" placeholder="eten bij mijn ouders">
-          <button type="submit" class="day__action">Save</button>
+          <button type="submit" class="day__action day__action--quiet">Save</button>
         </form>
       </details>
     </li>
