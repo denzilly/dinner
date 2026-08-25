@@ -6,7 +6,9 @@
 <h1>Proposed Picnic basket</h1>
 
 <p class="card__meta">
-  Week of {{ monday.strftime('%-d %B') }} ·
+  {# %-d (unpadded day) is a glibc extension and raises on Windows, so the day
+     is taken from the date itself rather than from a format string. #}
+  Week of {{ monday.day }} {{ monday.strftime('%B') }} ·
   <a href="{{ url_for('picnic.show', week=previous_week) }}">previous</a> ·
   <a href="{{ url_for('picnic.show', week=next_week) }}">next</a> ·
   <a href="{{ url_for('grocery.show', week=monday.isoformat()) }}">the shopping list</a>
