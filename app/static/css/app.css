@@ -253,6 +253,10 @@ main {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   transition: box-shadow 0.2s;
+  /* So the #day-<iso> anchor (used when returning from the choose page, and
+     as the no-JS fallback for every board action) lands the card clear of
+     the sticky header instead of tucked underneath it. */
+  scroll-margin-top: 5rem;
 }
 
 .day:hover { box-shadow: var(--shadow-lift); }
@@ -301,6 +305,23 @@ main {
   font-family: var(--font-label);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
+}
+
+/* Only shown once a day has a planned recipe with a stored photo, so an
+   unphotographed recipe (or an empty/skipped day) keeps the card's plainer
+   text-only layout instead of leaving a gap. */
+.day__photo {
+  display: block;
+  margin: -0.25rem -0.25rem 0;
+  border-radius: calc(var(--radius) - 0.25rem);
+  overflow: hidden;
+  line-height: 0;
+}
+
+.day__photo img {
+  width: 100%;
+  height: 7rem;
+  object-fit: cover;
 }
 
 .day__body {

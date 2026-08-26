@@ -41,7 +41,7 @@ def plan_days_between(start: date, end: date) -> dict[str, sqlite3.Row]:
     rows = get_db().execute(
         """SELECT p.plan_date, p.state, p.recipe_id, p.servings, p.locked, p.note,
                   r.title AS recipe_title, r.servings AS recipe_servings,
-                  r.prep_minutes, r.cook_minutes
+                  r.prep_minutes, r.cook_minutes, r.image_path
              FROM plan_days p
              LEFT JOIN recipes r ON r.id = p.recipe_id
             WHERE p.plan_date BETWEEN ? AND ?""",

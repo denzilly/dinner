@@ -1,8 +1,8 @@
 """The week board -- the main page -- and everything that mutates it."""
 from datetime import date, timedelta
 
-from flask import (Blueprint, abort, flash, redirect, render_template, request,
-                   url_for)
+from flask import (Blueprint, abort, flash, get_flashed_messages, jsonify,
+                   redirect, render_template, request, url_for)
 
 from app import planner, queries, weeks
 
@@ -16,13 +16,24 @@ def _parse_day(value: str) -> date:
         abort(404)
 
 
+def _wants_json() -> bool:
+    """True only for our own board JS, which marks its fetches with this
+    header. A plain form post -- including any client with JS disabled --
+    never sends it, so it still gets the classic redirect below."""
+    return request.headers.get("X-Requested-With") == "fetch"
+
+
 def _back_to_week(day: date):
-    return redirect(url_for("plan.week", week=weeks.monday_of(day).isoformat()))
+    """Redirect to the day's week, scrolled to that day's card rather than
+    the page top -- the anchor is what keeps the choose page's "pick a
+    recipe" round trip from dumping you back at the top of a long week."""
+    monday = weeks.monday_of(day)
+    target = url_for("plan.week", week=monday.isoformat())
+    return redirect(f"{target}#day-{day.isoformat()}")
 
 
-@bp.get("/")
-def week():
-    monday = weeks.parse_monday(request.args.get("week"))
+def _board_context(monday: date) -> dict:
+    """Everything the board and its partials need to render one week."""
     days = weeks.weekdays(monday)
     planned = queries.plan_days_between(days[0], days[-1])
     today = date.today()
@@ -39,6 +50,7 @@ def week():
                 "state": row["state"] if row else "empty",
                 "recipe_id": row["recipe_id"] if row else None,
                 "recipe_title": row["recipe_title"] if row else None,
+                "image_path": row["image_path"] if row else None,
                 "servings": (row["servings"] or row["recipe_servings"]) if row else None,
                 "prep_minutes": row["prep_minutes"] if row else None,
                 "cook_minutes": row["cook_minutes"] if row else None,
@@ -50,16 +62,52 @@ def week():
     empty_days = sum(1 for day in board if day["state"] == "empty")
     unlocked = sum(1 for day in board if day["state"] == "planned" and not day["locked"])
 
+    return {
+        "board": board,
+        "monday": monday,
+        "recipe_count": queries.recipe_count(),
+        "empty_days": empty_days,
+        "unlocked_count": unlocked,
+    }
+
+
+def _ajax_day_response(plan_date: date):
+    """Re-render just the one day card plus the actions bar, so the board JS
+    can swap them in place instead of reloading the page."""
+    ctx = _board_context(weeks.monday_of(plan_date))
+    day = next(d for d in ctx["board"] if d["iso"] == plan_date.isoformat())
+    return jsonify(
+        day_iso=day["iso"],
+        day_html=render_template("_day_card.html", day=day),
+        actions_html=render_template("_week_actions.html", **ctx),
+        flash_html=render_template(
+            "_flashes.html", messages=get_flashed_messages(with_categories=True)
+        ),
+    )
+
+
+def _ajax_week_response(monday: date):
+    """Re-render the whole board, for the week-wide fill/reroll actions --
+    those can touch every day at once."""
+    ctx = _board_context(monday)
+    return jsonify(
+        board_html=render_template("_board.html", **ctx),
+        actions_html=render_template("_week_actions.html", **ctx),
+        flash_html=render_template(
+            "_flashes.html", messages=get_flashed_messages(with_categories=True)
+        ),
+    )
+
+
+@bp.get("/")
+def week():
+    monday = weeks.parse_monday(request.args.get("week"))
     return render_template(
         "plan.html",
-        board=board,
-        monday=monday,
         previous_week=(monday - timedelta(days=7)).isoformat(),
         next_week=(monday + timedelta(days=7)).isoformat(),
         is_current_week=monday == weeks.current_monday(),
-        recipe_count=queries.recipe_count(),
-        empty_days=empty_days,
-        unlocked_count=unlocked,
+        **_board_context(monday),
     )
 
 
@@ -99,6 +147,8 @@ def set_day(day):
 
     queries.set_plan_day(plan_date, state="planned", recipe_id=recipe_id)
     flash(f"{weeks.WEEKDAY_NAMES[plan_date.weekday()]}: {recipe['title']}.", "success")
+    if _wants_json():
+        return _ajax_day_response(plan_date)
     return _back_to_week(plan_date)
 
 
@@ -121,10 +171,14 @@ def random_day(day):
             "No recipes available that aren't already planned this week.",
             "error",
         )
+        if _wants_json():
+            return _ajax_day_response(plan_date)
         return _back_to_week(plan_date)
 
     queries.set_plan_day(plan_date, state="planned", recipe_id=choice["id"])
     flash(f"{weeks.WEEKDAY_NAMES[plan_date.weekday()]}: {choice['title']}.", "success")
+    if _wants_json():
+        return _ajax_day_response(plan_date)
     return _back_to_week(plan_date)
 
 
@@ -132,6 +186,8 @@ def random_day(day):
 def skip_day(day):
     plan_date = _parse_day(day)
     queries.set_plan_day(plan_date, state="skip", recipe_id=None)
+    if _wants_json():
+        return _ajax_day_response(plan_date)
     return _back_to_week(plan_date)
 
 
@@ -139,6 +195,8 @@ def skip_day(day):
 def clear_day(day):
     plan_date = _parse_day(day)
     queries.set_plan_day(plan_date, state="empty", recipe_id=None, locked=False)
+    if _wants_json():
+        return _ajax_day_response(plan_date)
     return _back_to_week(plan_date)
 
 
@@ -155,6 +213,8 @@ def toggle_lock(day):
         servings=existing["servings"],
         locked=not existing["locked"],
     )
+    if _wants_json():
+        return _ajax_day_response(plan_date)
     return _back_to_week(plan_date)
 
 
@@ -170,6 +230,8 @@ def update_details(day):
         servings=request.form.get("servings", type=int),
         note=request.form.get("note", "").strip() or "",
     )
+    if _wants_json():
+        return _ajax_day_response(plan_date)
     return _back_to_week(plan_date)
 
 
@@ -198,6 +260,9 @@ def fill_week(monday):
         flash(f"Filled {filled} day{'' if filled == 1 else 's'}.", "success")
     else:
         flash("Nothing left to fill with.", "error")
+
+    if _wants_json():
+        return _ajax_week_response(start)
     return redirect(url_for("plan.week", week=start.isoformat()))
 
 
@@ -231,4 +296,7 @@ def reroll_week(monday):
         flash(f"Rerolled {rerolled} day{'' if rerolled == 1 else 's'}.", "success")
     else:
         flash("Nothing to reroll — every planned day is locked.", "info")
+
+    if _wants_json():
+        return _ajax_week_response(start)
     return redirect(url_for("plan.week", week=start.isoformat()))

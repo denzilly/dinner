@@ -1,0 +1,7 @@
+{#- The list of day cards. Its own partial so a week-wide action (fill/reroll)
+    can re-render every card at once, the same markup the full page uses. -#}
+<ol class="board" id="week-board">
+  {% for day in board %}
+    {% include "_day_card.html" %}
+  {% endfor %}
+</ol>

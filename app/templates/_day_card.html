@@ -1,0 +1,84 @@
+{% from "_icons.html" import icon %}
+{#- One day's card. Shared by the full board render and the board JS's fetch
+    responses -- day.iso backs both the #day-<iso> anchor (for browsers
+    without JS, and as the scroll target after a full page load) and the
+    data-day attribute the JS uses to find the card it needs to replace. -#}
+<li id="day-{{ day.iso }}" data-day="{{ day.iso }}"
+    class="day {% if day.is_today %}day--today{% endif %} day--{{ day.state }}
+           {% if day.locked %}day--locked{% endif %}">
+  <div class="day__header">
+    <h2 class="day__weekday">{{ day.weekday }}</h2>
+    <span class="day__date">{{ day.date.strftime('%d/%m') }}</span>
+    {% if day.state == 'planned' %}
+      {# The lock marks the card's state rather than acting on the recipe,
+         so it sits with the date and leaves the design's three-pill row. #}
+      <form method="post" action="{{ url_for('plan.toggle_lock', day=day.iso) }}" data-board-form>
+        <button type="submit" class="day__lock {{ 'is-on' if day.locked }}"
+                aria-label="{{ 'Locked — reroll skips this day' if day.locked else 'Lock against reroll' }}"
+                title="{{ 'Locked — reroll skips this day' if day.locked else 'Lock against reroll' }}">
+          {{ icon('lock' if day.locked else 'lock_open', 15) }}
+        </button>
+      </form>
+    {% endif %}
+  </div>
+
+  {% if day.state == 'planned' and day.recipe_id and day.image_path %}
+    <a class="day__photo" href="{{ url_for('recipes.detail', recipe_id=day.recipe_id) }}" tabindex="-1">
+      <img src="{{ url_for('recipes.image', name=day.image_path) }}" alt="" loading="lazy">
+    </a>
+  {% endif %}
+
+  <div class="day__body">
+    {% if day.state == 'planned' and day.recipe_id %}
+      <a class="day__recipe" href="{{ url_for('recipes.detail', recipe_id=day.recipe_id) }}">
+        {{ day.recipe_title }}
+      </a>
+      {% set total = (day.prep_minutes or 0) + (day.cook_minutes or 0) %}
+      <p class="day__stats">
+        {% if total %}<span>{{ icon('schedule', 14) }} {{ total }} min</span>{% endif %}
+        {% if day.servings %}<span>{{ icon('restaurant', 14) }} serves {{ day.servings }}</span>{% endif %}
+      </p>
+    {% elif day.state == 'skip' %}
+      <p class="day__empty">Eating out</p>
+    {% else %}
+      <p class="day__empty">Nothing planned</p>
+    {% endif %}
+
+    {% if day.note %}<p class="day__note">{{ day.note }}</p>{% endif %}
+  </div>
+
+  <div class="day__actions">
+    {% if day.state == 'planned' %}
+      <a class="day__action day__action--primary" href="{{ url_for('plan.choose', day=day.iso) }}">Change</a>
+      <form method="post" action="{{ url_for('plan.random_day', day=day.iso) }}" data-board-form>
+        <button type="submit" class="day__action day__action--secondary">Reroll</button>
+      </form>
+      <form method="post" action="{{ url_for('plan.clear_day', day=day.iso) }}" data-board-form>
+        <button type="submit" class="day__action day__action--quiet">Clear</button>
+      </form>
+    {% elif day.state == 'skip' %}
+      <form method="post" action="{{ url_for('plan.clear_day', day=day.iso) }}" data-board-form>
+        <button type="submit" class="day__action day__action--quiet">Undo skip</button>
+      </form>
+    {% else %}
+      <a class="day__action day__action--primary" href="{{ url_for('plan.choose', day=day.iso) }}">Choose</a>
+      <form method="post" action="{{ url_for('plan.random_day', day=day.iso) }}" data-board-form>
+        <button type="submit" class="day__action day__action--secondary">Random</button>
+      </form>
+      <form method="post" action="{{ url_for('plan.skip_day', day=day.iso) }}" data-board-form>
+        <button type="submit" class="day__action day__action--skip">Skip</button>
+      </form>
+    {% endif %}
+  </div>
+
+  <details class="day__details">
+    <summary>{{ icon('notes', 16) }} Servings &amp; note</summary>
+    <form method="post" action="{{ url_for('plan.update_details', day=day.iso) }}" data-board-form>
+      <label>Serves
+        <input type="number" name="servings" min="1" value="{{ day.servings or '' }}">
+      </label>
+      <input type="text" name="note" value="{{ day.note or '' }}" placeholder="eten bij mijn ouders">
+      <button type="submit" class="day__action day__action--quiet">Save</button>
+    </form>
+  </details>
+</li>
