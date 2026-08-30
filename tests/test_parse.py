@@ -160,6 +160,9 @@ def test_modifier_without_a_unit_stays_in_the_name():
         (0.5, "½"), (1.5, "1½"), (1 / 3, "⅓"), (2 / 3, "⅔"),
         (0.25, "¼"), (2.25, "2¼"), (2.0, "2"), (500.0, "500"),
         (1.2, "1.2"), (None, ""),
+        # Doesn't land on a fraction (an arbitrary scale/sum rarely does) --
+        # rounded to one decimal rather than shown as raw float noise.
+        (0.833333, "0.8"), (1.166666, "1.2"),
     ],
 )
 def test_format_quantity(value, rendered):

@@ -90,8 +90,9 @@ def _decimal(value: float, whole: bool = False) -> str:
     Grams and millilitres are rounded to whole numbers. A pound is 453.592 g,
     but printing "453.59 g pasta" claims a precision nobody shops to and makes
     the list look machine-generated; "454 g" says the same thing honestly.
+    Kilograms and litres go to one decimal place for the same reason.
     """
-    return f"{round(value):g}" if whole else f"{round(value, 2):g}"
+    return f"{round(value):g}" if whole else f"{round(value, 1):g}"
 
 
 def _render_segment(family: str, base_total: float, unit_votes: Counter) -> str:
