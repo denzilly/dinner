@@ -24,9 +24,9 @@
   // A day-scoped action (reroll, lock, skip, save note...) re-renders just
   // that one card plus the actions bar -- clearing the last empty day, say,
   // can make "Fill" disappear, so the bar has to stay in sync too.
-  function applyDayUpdate(payload) {
+  function applyDayUpdate(payload, collapseDetails) {
     var card = document.querySelector('[data-day="' + payload.day_iso + '"]');
-    var reopen = !!(card && card.querySelector(".day__details[open]"));
+    var reopen = !collapseDetails && !!(card && card.querySelector(".day__details[open]"));
     if (card) card.outerHTML = payload.day_html;
     if (reopen) {
       var details = document.querySelector(
@@ -61,6 +61,10 @@
     event.preventDefault();
     setBusy(form, true);
 
+    // Saving the servings/note form is the one action meant to close its
+    // own "Servings & note" disclosure rather than leave it open.
+    var collapseDetails = !!form.closest(".day__details");
+
     fetch(form.action, {
       method: "POST",
       body: new FormData(form),
@@ -75,7 +79,7 @@
         if (payload.board_html !== undefined) {
           applyWeekUpdate(payload);
         } else {
-          applyDayUpdate(payload);
+          applyDayUpdate(payload, collapseDetails);
         }
       })
       .catch(function () {

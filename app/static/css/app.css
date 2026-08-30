@@ -475,7 +475,7 @@ main {
   margin-top: 0.5rem;
 }
 
-.day__details label { display: flex; align-items: center; gap: 0.3rem; font-size: 0.78rem; color: var(--muted); }
+.day__details label { display: flex; align-items: center; justify-content: space-between; gap: 0.3rem; font-size: 0.78rem; color: var(--muted); }
 
 .day__details input { width: 100%; min-width: 0; font-size: 0.82rem; padding: 0.3rem 0.4rem; }
 
