@@ -176,7 +176,9 @@ def format_quantity(value: float | None) -> str:
     """Render a stored amount the way a recipe would write it.
 
     0.333333 as displayed by %g is noise on a shopping list; ⅓ is what the
-    source said in the first place.
+    source said in the first place. Anything that doesn't land on a fraction
+    (scaled or summed amounts rarely do) is rounded to one decimal place for
+    the same reason -- "0.833333 cup" claims a precision nobody measures to.
     """
     if value is None:
         return ""
@@ -186,7 +188,7 @@ def format_quantity(value: float | None) -> str:
         numerator, _, denominator = VULGAR_FRACTIONS[glyph].partition("/")
         if abs(remainder - int(numerator) / int(denominator)) < 0.005:
             return f"{whole}{glyph}" if whole else glyph
-    return f"{value:g}"
+    return f"{round(value, 1):g}"
 
 
 def _to_number(token: str) -> float | None:

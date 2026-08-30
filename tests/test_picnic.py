@@ -150,11 +150,11 @@ def planned_week(client, auth, app):
 
 
 def test_page_lists_unmapped_ingredients_as_needing_a_choice(client, planned_week):
-    page = client.get("/groceries/picnic").data
-    assert b"Needs a choice" in page
-    assert b"rundergehakt" in page
+    page = client.get("/groceries/picnic").data.decode()
+    assert "rundergehakt" in page
+    assert "match-row__cells--needs_choice" in page
     # Nothing is auto-selected, however good the search looks.
-    assert b"In the basket" not in page
+    assert "match-row__cells--mapped" not in page
 
 
 def test_staples_are_listed_but_not_ticked(client, planned_week, app):
@@ -182,9 +182,11 @@ def test_confirming_a_product_stores_the_mapping(client, planned_week, app, stub
         assert mapping["decision"] == "mapped"
         assert mapping["product_id"] == "s1001382"
 
-    page = client.get("/groceries/picnic").data
-    assert b"In the basket" in page
-    assert b"Needs a choice" not in page or b"uien" in page
+    page = client.get("/groceries/picnic").data.decode()
+    assert "match-row__cells--mapped" in page
+    assert "Slagershuys rundergehakt" in page
+    # uien is still unmapped, in the same table.
+    assert "uien" in page and "match-row__cells--needs_choice" in page
 
 
 def test_bad_pack_size_is_refused(client, planned_week, app, stub_picnic):
@@ -214,6 +216,7 @@ def test_never_is_remembered(client, planned_week, app):
 
     page = client.get("/groceries/picnic").data
     assert b"Not via Picnic" in page
+    assert b"match-row__cells--never" in page
 
     with app.app_context():
         assert queries.picnic_mappings([ingredient["id"]])[ingredient["id"]]["decision"] == "never"

@@ -1,18 +1,163 @@
 {% extends "base.html" %}
+{% from "_icons.html" import icon %}
 
 {% block title %}Picnic basket — Dinner{% endblock %}
 
-{% block content %}
-<h1>Proposed Picnic basket</h1>
+{#- One row, reused for both the main table and the Staples section below it.
+    `open_id`/`query`/`hits`/`error` are page-level: at most one row is ever
+    expanded, so they only actually render for that one call. #}
+{% macro match_row(item, monday, open_id, query, hits, error, units) %}
+  {% set line = item.line %}
+  {% set ingredient_id = line.ingredient_id %}
+  {% set is_open = open_id == ingredient_id %}
+  <div class="match-row {{ 'match-row--excluded' if item.status == 'never' }}" id="row-{{ ingredient_id }}">
+    <div class="match-row__cells match-row__cells--{{ item.status }}">
+      <div class="match-row__cell match-row__qty">{{ line.amount }}</div>
+      <div class="match-row__cell match-row__name">{{ line.name }}</div>
+      <div class="match-row__cell match-row__product">
+        {% if item.status == 'mapped' %}
+          {{ item.mapping.product_name or line.name }}
+          {% if item.stale %}
+            <span class="needs-value">no longer matches — needs {{ line.amount }}</span>
+          {% elif item.partial %}
+            <span class="needs-value">only covers part of “{{ line.amount }}”</span>
+          {% endif %}
+        {% elif item.status == 'never' %}
+          Not via Picnic
+        {% endif %}
+      </div>
+      <div class="match-row__cell match-row__pack">
+        {% if item.status == 'mapped' and item.plan %}{{ item.plan.summary }}{% endif %}
+      </div>
+      <div class="match-row__cell match-row__selected">
+        {% if item.status == 'mapped' %}
+          <input type="checkbox" name="include" value="{{ ingredient_id }}" form="picnic-push"
+                 {{ 'checked' if not item.stale and not line.staple }}
+                 aria-label="Include {{ line.name }} in this week's Picnic order">
+        {% elif item.status == 'never' %}
+          <span class="match-row__dash">—</span>
+        {% else %}
+          {{ icon('close', 16) }}
+        {% endif %}
+      </div>
+      <div class="match-row__cell match-row__toggle-cell">
+        <form method="post" action="{{ url_for('picnic.confirm', ingredient_id=ingredient_id) }}">
+          <input type="hidden" name="week" value="{{ monday.isoformat() }}">
+          <input type="hidden" name="action" value="{{ 'forget' if item.status == 'never' else 'never' }}">
+          <button type="submit" class="match-row__toggle {{ 'is-active' if item.status == 'never' }}"
+                  title="{{ 'Reconsider' if item.status == 'never' else 'Not via Picnic' }}">
+            {{ icon('block', 16) }}
+          </button>
+        </form>
+      </div>
+      <div class="match-row__cell match-row__expand-cell">
+        <a class="match-row__chevron {{ 'is-open' if is_open }}"
+           href="{{ url_for('picnic.show', week=monday.isoformat(),
+                            open=(None if is_open else ingredient_id)) }}#row-{{ ingredient_id }}"
+           aria-expanded="{{ 'true' if is_open else 'false' }}"
+           aria-label="{{ 'Collapse' if is_open else 'Expand' }} {{ line.name }}">
+          {{ icon('expand_more', 20) }}
+        </a>
+      </div>
+    </div>
 
-<p class="card__meta">
-  {# %-d (unpadded day) is a glibc extension and raises on Windows, so the day
-     is taken from the date itself rather than from a format string. #}
-  Week of {{ monday.day }} {{ monday.strftime('%B') }} ·
-  <a href="{{ url_for('picnic.show', week=previous_week) }}">previous</a> ·
-  <a href="{{ url_for('picnic.show', week=next_week) }}">next</a> ·
-  <a href="{{ url_for('grocery.show', week=monday.isoformat()) }}">the shopping list</a>
-</p>
+    {% if is_open %}
+      <div class="match-row__panel">
+        {% if item.status == 'mapped' %}
+          <p class="match-row__current">
+            Currently <strong>{{ item.mapping.product_name or item.mapping.product_id }}</strong>,
+            one pack covers {{ item.mapping.pack_covers_qty }} {{ item.mapping.pack_covers_unit }}.
+          </p>
+        {% endif %}
+
+        <form class="match-search" method="get" action="{{ url_for('picnic.show') }}">
+          <input type="hidden" name="week" value="{{ monday.isoformat() }}">
+          <input type="hidden" name="open" value="{{ ingredient_id }}">
+          <label class="match-search__label" for="q-{{ ingredient_id }}">Search Picnic</label>
+          <div class="match-search__row">
+            <input id="q-{{ ingredient_id }}" name="q" value="{{ query }}">
+            <button type="submit" class="button">{{ icon('search', 16) }} Search</button>
+          </div>
+        </form>
+
+        {% if error %}
+          <p class="warnings">{{ error }}</p>
+        {% elif not hits %}
+          <p class="empty-state">No results for “{{ query }}”. Try another wording.</p>
+        {% else %}
+          <div class="match-products">
+            <div class="match-products__head">
+              <span>Product</span><span>Price</span><span>Price/kg</span>
+              <span>One pack covers</span><span></span>
+            </div>
+            {% for hit in hits %}
+              <form class="match-products__row" method="post"
+                    action="{{ url_for('picnic.confirm', ingredient_id=ingredient_id) }}">
+                <input type="hidden" name="week" value="{{ monday.isoformat() }}">
+                <input type="hidden" name="product_id" value="{{ hit.product_id }}">
+                <input type="hidden" name="product_name" value="{{ hit.name }}">
+                <input type="hidden" name="picnic_unit_text" value="{{ hit.unit_text or '' }}">
+                <div class="match-products__name">
+                  <div>{{ hit.name }}</div>
+                  <div class="match-products__size">{{ hit.unit_text or 'no stated size' }}</div>
+                </div>
+                <div class="match-products__price">{{ hit.price or '—' }}</div>
+                <div class="match-products__perunit">{{ hit.per_unit or '—' }}</div>
+                <div class="match-products__covers">
+                  <input class="input-tiny" type="text" name="pack_covers_qty" required
+                         value="{{ hit.parsed[0] if hit.parsed else '' }}"
+                         aria-label="One pack covers">
+                  <select name="pack_covers_unit" aria-label="Unit">
+                    {% for unit in units %}
+                      <option value="{{ unit }}"
+                        {{ 'selected' if hit.parsed and hit.parsed[1] == unit }}>{{ unit }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="match-products__action">
+                  <button type="submit" class="button button--primary">Use this one</button>
+                </div>
+                {% if not hit.parsed %}
+                  <p class="warnings match-products__warning">
+                    Picnic states this as “{{ hit.unit_text or 'nothing' }}”, which doesn't
+                    convert to a recipe unit — say what one pack covers.
+                  </p>
+                {% endif %}
+              </form>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+{% endmacro %}
+
+{% block content %}
+{# Same week-nav component as the board and the plain grocery list, so all
+   three week-scoped pages share one look instead of picnic.html inventing
+   its own. #}
+<div class="week-nav">
+  <a class="week-nav__step" href="{{ url_for('picnic.show', week=previous_week) }}" rel="prev">
+    {{ icon('arrow_back') }} Previous
+  </a>
+  <div class="week-nav__label">
+    <h1>Picnic basket — {{ monday.strftime('%d %B') }}</h1>
+    {% if not is_current_week %}
+      <a class="week-nav__today" href="{{ url_for('picnic.show') }}">Back to this week</a>
+    {% endif %}
+  </div>
+  <a class="week-nav__step" href="{{ url_for('picnic.show', week=next_week) }}" rel="next">
+    Next {{ icon('arrow_forward') }}
+  </a>
+</div>
+
+{% if has_anything %}
+  <div class="week-actions">
+    {# A link out, not a section: this page stays the one that builds a
+       Picnic order, the plain list stays the one you shop from yourself. #}
+    <a class="button" href="{{ url_for('grocery.show', week=monday.isoformat()) }}">The shopping list</a>
+  </div>
+{% endif %}
 
 {% if not has_anything %}
   <p class="empty-state">
@@ -21,107 +166,50 @@
   </p>
 {% else %}
 
-<form method="post" action="{{ url_for('picnic.push') }}">
+{#- Rows post their own actions (search, use-this-one, the not-via-Picnic
+    toggle), so this can't wrap the table -- nested <form>s aren't valid HTML.
+    The "include" checkboxes and the final submit button instead point at
+    this one by id via the `form=` attribute. #}
+<form id="picnic-push" method="post" action="{{ url_for('picnic.push') }}">
   <input type="hidden" name="week" value="{{ monday.isoformat() }}">
-
-  {% if undecided %}
-    <h2>Needs a choice</h2>
-    <p class="warnings">
-      Picnic's search ranking can't be trusted, so nothing here is picked
-      automatically. Confirm each one once and it won't be asked again.
-    </p>
-    <ul class="ingredients">
-      {% for line in undecided %}
-        <li>
-          <span class="qty">{{ line.amount }}</span> {{ line.name }}
-          <a class="button" href="{{ url_for('picnic.choose', ingredient_id=line.ingredient_id, week=monday.isoformat()) }}">Choose product</a>
-        </li>
-      {% endfor %}
-    </ul>
-  {% endif %}
-
-  {% if proposed %}
-    <h2>In the basket</h2>
-    <ul class="ingredients">
-      {% for item in proposed %}
-        <li>
-          <label>
-            <input type="checkbox" name="include"
-                   value="{{ item.line.ingredient_id }}"
-                   {% if not item.stale %}checked{% endif %}>
-            {% if item.plan %}
-              <span class="qty">{{ item.plan.packs }}&times;</span>
-            {% endif %}
-            {{ item.mapping.product_name or item.line.name }}
-          </label>
-
-          {% if item.plan %}
-            {# Rounding up changes what you're charged, so it's stated here
-               rather than left to be inferred from the total. #}
-            <span class="ing-note">{{ item.plan.summary }}</span>
-          {% endif %}
-
-          {% if item.stale %}
-            <span class="needs-value">no longer matches — the recipes ask for
-              {{ item.line.amount }}</span>
-          {% endif %}
-          {% if item.partial %}
-            <span class="needs-value">only covers part of “{{ item.line.amount }}”</span>
-          {% endif %}
-
-          <a href="{{ url_for('picnic.choose', ingredient_id=item.line.ingredient_id, week=monday.isoformat()) }}">change</a>
-        </li>
-      {% endfor %}
-    </ul>
-  {% endif %}
-
-  {% if staples %}
-    <h2>Staples</h2>
-    <p class="card__meta">
-      Not added unless you tick them — these get bought every few months, not
-      every week.
-    </p>
-    <ul class="ingredients">
-      {% for item in staples %}
-        <li>
-          {% if item.mapping and item.mapping.decision == 'mapped' %}
-            <label>
-              <input type="checkbox" name="include" value="{{ item.line.ingredient_id }}">
-              {{ item.mapping.product_name or item.line.name }}
-            </label>
-            <span class="ing-note">one pack</span>
-          {% else %}
-            {{ item.line.name }}
-            <a href="{{ url_for('picnic.choose', ingredient_id=item.line.ingredient_id, week=monday.isoformat()) }}">choose product</a>
-          {% endif %}
-        </li>
-      {% endfor %}
-    </ul>
-  {% endif %}
-
-  {% if never %}
-    <h2>Not via Picnic</h2>
-    <p class="card__meta">Left for the shopping list — asked once, not weekly.</p>
-    <ul class="ingredients">
-      {% for item in never %}
-        <li>
-          <span class="qty">{{ item.line.amount }}</span> {{ item.line.name }}
-          <a href="{{ url_for('picnic.choose', ingredient_id=item.line.ingredient_id, week=monday.isoformat()) }}">reconsider</a>
-        </li>
-      {% endfor %}
-    </ul>
-  {% endif %}
-
-  {% if proposed or staples %}
-    <div class="card__actions">
-      <button type="submit" class="button button--primary">Add to Picnic basket</button>
-    </div>
-    <p class="card__meta">
-      This only fills the basket. Delivery slot and checkout happen in the
-      Picnic app.
-    </p>
-  {% endif %}
 </form>
+
+{% if items %}
+  <div class="match-table">
+    <div class="match-table__head">
+      <span>Qty</span><span>Name</span><span>Picnic Item</span><span>Pack</span>
+      <span>Selected</span><span>Not via Picnic</span><span></span>
+    </div>
+    {% for item in items %}
+      {{ match_row(item, monday, open_id, query, hits, error, units) }}
+    {% endfor %}
+  </div>
+{% endif %}
+
+{% if staples %}
+  <h2>Staples</h2>
+  <p class="card__meta">
+    Not added unless you tick them — these get bought every few months, not
+    every week.
+  </p>
+  <div class="match-table">
+    <div class="match-table__head">
+      <span>Qty</span><span>Name</span><span>Picnic Item</span><span>Pack</span>
+      <span>Selected</span><span>Not via Picnic</span><span></span>
+    </div>
+    {% for item in staples %}
+      {{ match_row(item, monday, open_id, query, hits, error, units) }}
+    {% endfor %}
+  </div>
+{% endif %}
+
+<div class="card__actions">
+  <button type="submit" form="picnic-push" class="button button--primary">Add to Picnic basket</button>
+</div>
+<p class="card__meta">
+  This only fills the basket. Delivery slot and checkout happen in the
+  Picnic app.
+</p>
 
 {% endif %}
 {% endblock %}
