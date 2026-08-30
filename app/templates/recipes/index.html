@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "_icons.html" import icon %}
+{% from "_recipe_filters.html" import filters_form %}
 
 {% block title %}Recipes — Dinner{% endblock %}
 
@@ -14,99 +15,8 @@
   </a>
 </div>
 
-<form class="filters" method="get" action="{{ url_for('recipes.index') }}">
-  {# Enter in the search box needs a submit button that is always rendered,
-     since the minutes field is the only other thing in this form that submits. #}
-  <button type="submit" class="visually-hidden" tabindex="-1">Search</button>
-
-  <div class="filters__row">
-    <div class="search-field">
-      {{ icon('search', 20) }}
-      <input type="search" name="q" value="{{ query }}" placeholder="Search recipes…"
-             aria-label="Search recipes">
-    </div>
-
-    <select name="sort" aria-label="Sort by">
-      <option value="title" {{ 'selected' if sort == 'title' }}>Sort: A–Z</option>
-      <option value="recent" {{ 'selected' if sort == 'recent' }}>Sort: recently added</option>
-      <option value="unused" {{ 'selected' if sort == 'unused' }}>Sort: least recently cooked</option>
-      <option value="time" {{ 'selected' if sort == 'time' }}>Sort: quickest first</option>
-    </select>
-  </div>
-
-  {# Second row: a small tag search that adds one tag at a time (already-active
-     tags drop out of the results and appear in the Active row below instead),
-     plus the cooking-time filter alongside it. #}
-  <div class="filters__row filters__row--secondary">
-    <div class="tag-search" data-tag-search>
-      {{ icon('search', 18) }}
-      <input type="text" class="tag-search__input" placeholder="Search tags to add…"
-             autocomplete="off" aria-label="Search tags to add">
-      <div class="tag-search__menu" hidden>
-        {% set ns = namespace(count=0) %}
-        {% for kind, tags in tags_by_kind.items() %}
-          {% for tag in tags if tag.id not in active_tags %}
-            {% set ns.count = ns.count + 1 %}
-            <a class="tag-search__option" data-tag-name="{{ tag.name|lower }}"
-               href="{{ url_for('recipes.index', q=query or None, sort=sort,
-                                max_minutes=max_minutes or None,
-                                tag=active_tags + [tag.id]) }}">
-              {{ tag.name }} <span class="tag-search__kind">{{ kind }}</span>
-            </a>
-          {% endfor %}
-        {% endfor %}
-        {% if ns.count == 0 %}
-          <p class="tag-search__empty">
-            {% if tags_by_kind %}
-              All tags are already applied.
-            {% else %}
-              No tags yet — they are added when you accept a recipe for the bank.
-            {% endif %}
-          </p>
-        {% endif %}
-        <p class="tag-search__empty tag-search__empty--no-match" hidden>No matching tags.</p>
-      </div>
-    </div>
-
-    <label class="time-filter">
-      {{ icon('schedule', 18) }}
-      Ready in under
-      <input type="number" name="max_minutes" min="5" step="5"
-             value="{{ max_minutes or '' }}" class="input-tiny" data-auto-submit> minutes
-    </label>
-  </div>
-
-  {% if active_tag_rows or max_minutes or query %}
-    <div class="filters__active">
-      <span class="filters__active-label">Active:</span>
-
-      {% if query %}
-        <a class="chip chip--active"
-           href="{{ url_for('recipes.index', sort=sort, max_minutes=max_minutes or None, tag=active_tags) }}">
-          “{{ query }}” {{ icon('close', 14) }}
-        </a>
-      {% endif %}
-
-      {% if max_minutes %}
-        <a class="chip chip--active"
-           href="{{ url_for('recipes.index', q=query or None, sort=sort, tag=active_tags) }}">
-          under {{ max_minutes }} min {{ icon('close', 14) }}
-        </a>
-      {% endif %}
-
-      {% for tag in active_tag_rows %}
-        <a class="chip chip--active"
-           href="{{ url_for('recipes.index', q=query or None, sort=sort,
-                            max_minutes=max_minutes or None,
-                            tag=active_tags|reject('equalto', tag.id)|list) }}">
-          {{ tag.name }} {{ icon('close', 14) }}
-        </a>
-      {% endfor %}
-
-      <a class="link-button" href="{{ url_for('recipes.index') }}">Clear all</a>
-    </div>
-  {% endif %}
-</form>
+{{ filters_form('recipes.index', query, tags_by_kind, active_tags, active_tag_rows, max_minutes,
+                sort=sort) }}
 
 {% if not recipes %}
   <p class="empty-state">
@@ -124,7 +34,7 @@
   <ul class="recipe-list">
     {% for recipe in recipes %}
       <li class="recipe-card">
-        <a href="{{ url_for('recipes.detail', recipe_id=recipe.id) }}">
+        <a class="recipe-card__hit" href="{{ url_for('recipes.detail', recipe_id=recipe.id) }}">
           <div class="recipe-card__thumb">
             {% if recipe.image_path %}
               <img src="{{ url_for('recipes.image', name=recipe.image_path) }}"
@@ -151,6 +61,4 @@
     {% endfor %}
   </ul>
 {% endif %}
-
-<script src="{{ url_for('static', filename='js/recipes.js') }}" defer></script>
 {% endblock %}

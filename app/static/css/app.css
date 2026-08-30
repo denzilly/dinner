@@ -491,26 +491,6 @@ main {
 
 .surprise { margin-bottom: 1.25rem; }
 
-.choose-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
-
-.choose-list__pick {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.5rem;
-  width: 100%;
-  padding: 0.7rem 0.85rem;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text);
-  font: inherit;
-  text-align: left;
-}
-
-.choose-list__pick:hover { border-color: var(--accent); }
-
 .warn-inline { color: var(--accent); }
 
 /* Grocery list -- used one-handed in a shop, so rows are generous and the
@@ -1237,9 +1217,18 @@ button { cursor: pointer; }
 
 .recipe-card:hover { box-shadow: var(--shadow-lift); }
 
-.recipe-card a {
+/* Shared by the browse link (recipes bank) and the pick button (day chooser)
+   -- same row, different action underneath. */
+.recipe-card__hit {
   display: flex;
   align-items: stretch;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: none;
+  font: inherit;
+  text-align: left;
   color: var(--text);
   text-decoration: none;
 }
@@ -1284,7 +1273,7 @@ button { cursor: pointer; }
   transition: color 0.15s;
 }
 
-.recipe-card a:hover .recipe-card__title { color: var(--tint); }
+.recipe-card__hit:hover .recipe-card__title { color: var(--tint); }
 
 .recipe-card__meta {
   display: flex;
@@ -1302,7 +1291,7 @@ button { cursor: pointer; }
 .recipe-card__source { color: var(--muted); margin-left: auto; }
 
 @media (max-width: 640px) {
-  .recipe-card a { flex-direction: column; }
+  .recipe-card__hit { flex-direction: column; }
   .recipe-card__thumb { width: 100%; height: 9rem; }
   .recipe-card__source { margin-left: 0; }
 }
