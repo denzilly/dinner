@@ -85,17 +85,17 @@ def test_clear_all_drops_everything(client, bank):
     assert "filters__active" not in after
 
 
-def test_the_filter_dropdown_carries_the_tag_bank(client, bank):
+def test_the_tag_search_carries_the_tag_bank(client, bank):
     markup = client.get("/recipes/").get_data(as_text=True)
-    assert markup.count('name="tag"') == 2
-    assert "filter-menu__panel" in markup
+    assert markup.count('class="tag-search__option"') == 2
+    assert "Pasta" in markup and "Vegetarian" in markup
 
 
-def test_the_filter_button_counts_what_is_applied(client, bank):
-    markup = client.get(
-        f"/recipes/?max_minutes=30&tag={bank['pasta']}&tag={bank['vegetarian']}"
-    ).get_data(as_text=True)
-    assert re.search(r'filter-menu__count">(\d+)', markup).group(1) == "3"
+def test_the_tag_search_drops_tags_already_active(client, bank):
+    markup = client.get(f"/recipes/?tag={bank['pasta']}").get_data(as_text=True)
+    assert markup.count('class="tag-search__option"') == 1
+    assert 'data-tag-name="vegetarian"' in markup
+    assert 'data-tag-name="pasta"' not in markup
 
 
 def test_filters_actually_narrow_the_results(client, bank):

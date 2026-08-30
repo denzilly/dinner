@@ -126,6 +126,11 @@ def choose(day):
     for tag in queries.tags_with_counts():
         tags_by_kind.setdefault(tag["kind"], []).append(tag)
 
+    # The "Active" chip row needs names, not just the ids from the query string.
+    active_tag_rows = [
+        tag for tags in tags_by_kind.values() for tag in tags if tag["id"] in filters.tag_ids
+    ]
+
     return render_template(
         "choose.html",
         plan_date=plan_date,
@@ -134,6 +139,7 @@ def choose(day):
         already_planned=already,
         filters=filters,
         tags_by_kind=tags_by_kind,
+        active_tag_rows=active_tag_rows,
     )
 
 
