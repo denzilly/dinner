@@ -23,14 +23,16 @@
   </div>
 
   {% if day.state == 'planned' and day.recipe_id and day.image_path %}
-    <a class="day__photo" href="{{ url_for('recipes.detail', recipe_id=day.recipe_id) }}" tabindex="-1">
+    <a class="day__photo"
+       href="{{ url_for('recipes.detail', recipe_id=day.recipe_id, servings=day.servings) }}" tabindex="-1">
       <img src="{{ url_for('recipes.image', name=day.image_path) }}" alt="" loading="lazy">
     </a>
   {% endif %}
 
   <div class="day__body">
     {% if day.state == 'planned' and day.recipe_id %}
-      <a class="day__recipe" href="{{ url_for('recipes.detail', recipe_id=day.recipe_id) }}">
+      <a class="day__recipe"
+         href="{{ url_for('recipes.detail', recipe_id=day.recipe_id, servings=day.servings) }}">
         {{ day.recipe_title }}
       </a>
       {% set total = (day.prep_minutes or 0) + (day.cook_minutes or 0) %}

@@ -4,7 +4,7 @@ import json
 from flask import (Blueprint, abort, flash, redirect, render_template, request,
                    send_from_directory, url_for)
 
-from app import images, parse, queries
+from app import grocery, images, parse, queries
 from app.routes_api import _ingest_payload
 
 bp = Blueprint("recipes", __name__, url_prefix="/recipes")
@@ -194,14 +194,36 @@ def image(name):
 
 @bp.get("/<int:recipe_id>")
 def detail(recipe_id):
+    """The `servings` query arg is how the day card asks to see a recipe at the
+    number of diners actually planned for that day, rather than whatever the
+    recipe's stored yield happens to be -- it never changes the stored recipe,
+    just what this one view renders."""
     recipe = queries.get_recipe(recipe_id)
     if recipe is None:
         abort(404)
+
+    target_servings = request.args.get("servings", type=int)
+    if target_servings is not None and target_servings < 1:
+        target_servings = 1
+    scale = grocery.scale_factor(recipe["servings"], target_servings)
+
+    ingredients = queries.ingredients_for_recipe(recipe_id)
+    if scale != 1.0:
+        # Rounded to 2dp before formatting -- an arbitrary scale factor (10
+        # servings down to 2 is /5) rarely lands on a clean fraction, and
+        # "0.133333 cup" claims a precision nobody is measuring to.
+        ingredients = [
+            dict(row, quantity=round(row["quantity"] * scale, 2) if row["quantity"] is not None else None)
+            for row in ingredients
+        ]
+
     return render_template(
         "recipes/detail.html",
         recipe=recipe,
-        ingredients=queries.ingredients_for_recipe(recipe_id),
+        ingredients=ingredients,
         tags=queries.tags_for_recipe(recipe_id),
+        target_servings=target_servings,
+        effective_servings=target_servings or recipe["servings"],
     )
 
 

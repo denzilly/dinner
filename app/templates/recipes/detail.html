@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_icons.html" import icon %}
 
 {% block title %}{{ recipe.title }} — Dinner{% endblock %}
 
@@ -8,15 +9,41 @@
   <a class="button" href="{{ url_for('recipes.edit', recipe_id=recipe.id) }}">Edit</a>
 </div>
 
-<p class="card__meta">
-  serves {{ recipe.servings }}
-  {% if recipe.prep_minutes %} · {{ recipe.prep_minutes }} min prep{% endif %}
-  {% if recipe.cook_minutes %} · {{ recipe.cook_minutes }} min cooking{% endif %}
-  {% if recipe.source_url %}
-    · <a href="{{ recipe.source_url }}" target="_blank" rel="noopener noreferrer">
-        {{ recipe.source_name or 'original' }}</a>
+{#- A view-only rescale: it only ever changes the `servings` query arg on this
+    page, so it never touches the stored recipe, the planner, or the grocery
+    list -- those all read the recipe's own servings column, untouched here. -#}
+<div class="servings-stepper">
+  <form method="get">
+    <button type="submit" name="servings" value="{{ effective_servings - 1 }}"
+            aria-label="Fewer servings" {{ 'disabled' if effective_servings <= 1 }}>
+      {{ icon('remove', 16) }}
+    </button>
+    <span class="servings-stepper__count">serves {{ effective_servings }}</span>
+    <button type="submit" name="servings" value="{{ effective_servings + 1 }}" aria-label="More servings">
+      {{ icon('add', 16) }}
+    </button>
+  </form>
+  {% if effective_servings != recipe.servings %}
+    <a class="servings-stepper__reset" href="{{ url_for('recipes.detail', recipe_id=recipe.id) }}">
+      reset to {{ recipe.servings }}
+    </a>
   {% endif %}
-</p>
+</div>
+
+{% if recipe.prep_minutes or recipe.cook_minutes or recipe.source_url %}
+  <p class="card__meta">
+    {%- if recipe.prep_minutes -%}
+      {{ recipe.prep_minutes }} min prep
+      {%- if recipe.cook_minutes %} · {{ recipe.cook_minutes }} min cooking{% endif -%}
+    {%- elif recipe.cook_minutes -%}
+      {{ recipe.cook_minutes }} min cooking
+    {%- endif -%}
+    {%- if recipe.source_url -%}
+      {% if recipe.prep_minutes or recipe.cook_minutes %} · {% endif -%}
+      <a href="{{ recipe.source_url }}" target="_blank" rel="noopener noreferrer">{{ recipe.source_name or 'original' }}</a>
+    {%- endif -%}
+  </p>
+{% endif %}
 
 {% if tags %}
   <p class="tag-row">

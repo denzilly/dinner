@@ -905,6 +905,43 @@ button { cursor: pointer; }
 
 .card__meta a { color: var(--accent); }
 
+.servings-stepper { display: flex; align-items: center; gap: 0.6rem; margin: 0.4rem 0; }
+
+.servings-stepper form { display: flex; align-items: center; gap: 0.5rem; }
+
+.servings-stepper button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--secondary);
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.servings-stepper button:hover:not(:disabled) { border-color: var(--secondary); color: var(--accent); }
+
+.servings-stepper button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.servings-stepper__count {
+  min-width: 5.5rem;
+  text-align: center;
+  font-family: var(--font-label);
+  font-size: 0.95rem;
+}
+
+.servings-stepper__reset {
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-decoration: underline;
+}
+
+.servings-stepper__reset:hover { color: var(--accent); }
+
 .warnings {
   margin: 0 0 0.6rem;
   padding: 0.5rem 0.65rem;
