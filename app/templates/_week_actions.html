@@ -1,0 +1,21 @@
+{% from "_icons.html" import icon %}
+{#- The fill/reroll bar above the board. A day-scoped action can change these
+    counts (e.g. clearing the last planned day makes "Reroll" disappear), so
+    the board JS replaces this whole block alongside the card it just
+    touched. The id stays on the div unconditionally so that swap always has
+    somewhere to land, even on a week with nothing to fill or reroll. -#}
+{% set has_actions = recipe_count and (empty_days or unlocked_count) %}
+<div id="week-actions" class="{{ 'week-actions' if has_actions }}">
+  {% if has_actions %}
+    {% if empty_days %}
+      <form method="post" action="{{ url_for('plan.fill_week', monday=monday.isoformat()) }}" data-board-form data-scope="week">
+        <button type="submit" class="button">Fill {{ empty_days }} empty day{{ '' if empty_days == 1 else 's' }}</button>
+      </form>
+    {% endif %}
+    {% if unlocked_count %}
+      <form method="post" action="{{ url_for('plan.reroll_week', monday=monday.isoformat()) }}" data-board-form data-scope="week">
+        <button type="submit" class="button">{{ icon('shuffle') }} Reroll {{ unlocked_count }} unlocked</button>
+      </form>
+    {% endif %}
+  {% endif %}
+</div>

@@ -1,0 +1,10 @@
+{#- Shared by the full page load (base.html) and the board JS's fetch
+    responses, so a flash reads the same whether the page just loaded or an
+    action was just applied in place. -#}
+{% if messages %}
+  <ul class="flashes">
+    {% for category, message in messages %}
+      <li class="flash flash--{{ category }}">{{ message }}</li>
+    {% endfor %}
+  </ul>
+{% endif %}
