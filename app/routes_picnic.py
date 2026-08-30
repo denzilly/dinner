@@ -9,11 +9,11 @@ Nothing here auto-selects a product. Picnic's search ranking cannot be trusted
 (its top hit for "olijfolie" is an olive oil spray), so an ingredient is either
 already confirmed by a human or it is waiting for one.
 
-**This page makes no API calls.** Re-resolving every mapped product on load
-would be ~20 sequential round-trips before anything renders. Searching happens
-on the choose page, one ingredient at a time, and the real prices come back
-from Picnic's own cart after the push -- which is more trustworthy than an
-estimate assembled here anyway.
+**This page makes no bulk API calls.** Re-resolving every mapped product on
+load would be ~20 sequential round-trips before anything renders. A row's
+search only ever runs for that one row, when it's expanded (`open` in the
+query string) -- the real prices come back from Picnic's own cart after the
+push anyway, which is more trustworthy than an estimate assembled here.
 """
 from datetime import timedelta
 
@@ -32,51 +32,70 @@ def _week_lines(monday):
     return grocery.build_lines(queries.week_ingredients(days[0], days[-1]))
 
 
+def _row(line, mapping):
+    """One line's match state, in the shape the table row (and the row's own
+    expanded panel) render from."""
+    if mapping is None:
+        return {"line": line, "mapping": None, "plan": None,
+                "status": "needs_choice", "stale": False, "partial": False}
+
+    if mapping["decision"] == "never":
+        return {"line": line, "mapping": mapping, "plan": None,
+                "status": "never", "stale": False, "partial": False}
+
+    plan = picnic.plan_packs(
+        line.totals, mapping["pack_covers_qty"], mapping["pack_covers_unit"]
+    )
+    return {
+        "line": line, "mapping": mapping, "plan": plan, "status": "mapped",
+        # A mapping in grams answers the mass part of "1 blik + 400 g
+        # tomaten" and says nothing about the tin. Flag it rather than
+        # quietly buying half of what the week needs.
+        "partial": plan is not None and line.split,
+        # The recipes changed under a mapping that no longer fits.
+        "stale": plan is None,
+    }
+
+
+_STATUS_ORDER = {"needs_choice": 0, "mapped": 1, "never": 2}
+
+
 def _plan(lines):
-    """Sort the week's lines into the four states the page renders."""
+    """Sort the week's lines into the matchable table (unmatched first, then
+    matched, then "not via Picnic") and the staples, which stay a separate
+    opt-in list rather than joining the table."""
     mappings = queries.picnic_mappings(line.ingredient_id for line in lines)
 
-    proposed, undecided, never, staples = [], [], [], []
-
+    matchable, staples = [], []
     for line in lines:
-        mapping = mappings.get(line.ingredient_id)
+        row = _row(line, mappings.get(line.ingredient_id))
+        # Shown so you can eyeball whether you're low, never added by
+        # default: olive oil is in half the recipes and bought quarterly.
+        (staples if line.staple else matchable).append(row)
 
-        if line.staple:
-            # Shown so you can eyeball whether you're low, never added by
-            # default: olive oil is in half the recipes and bought quarterly.
-            staples.append({"line": line, "mapping": mapping})
-            continue
-
-        if mapping is None:
-            undecided.append(line)
-            continue
-
-        if mapping["decision"] == "never":
-            never.append({"line": line, "mapping": mapping})
-            continue
-
-        plan = picnic.plan_packs(
-            line.totals, mapping["pack_covers_qty"], mapping["pack_covers_unit"]
-        )
-        proposed.append({
-            "line": line,
-            "mapping": mapping,
-            "plan": plan,
-            # A mapping in grams answers the mass part of "1 blik + 400 g
-            # tomaten" and says nothing about the tin. Flag it rather than
-            # quietly buying half of what the week needs.
-            "partial": plan is not None and line.split,
-            # The recipes changed under a mapping that no longer fits.
-            "stale": plan is None,
-        })
-
-    return proposed, undecided, never, staples
+    matchable.sort(key=lambda item: _STATUS_ORDER[item["status"]])
+    return matchable, staples
 
 
 @bp.get("/groceries/picnic")
 def show():
     monday = weeks.parse_monday(request.args.get("week"))
-    proposed, undecided, never, staples = _plan(_week_lines(monday))
+    items, staples = _plan(_week_lines(monday))
+
+    # At most one row's search ever runs -- whichever one is expanded.
+    open_id = request.args.get("open", type=int)
+    query = request.args.get("q") or ""
+    hits, error = [], None
+    open_item = next(
+        (item for item in items + staples if item["line"].ingredient_id == open_id),
+        None,
+    )
+    if open_item is not None:
+        query = query or open_item["line"].name
+        try:
+            hits = picnic.search(picnic.client(), query)
+        except picnic.PicnicUnavailable as exc:
+            error = str(exc)
 
     return render_template(
         "picnic.html",
@@ -84,42 +103,13 @@ def show():
         previous_week=(monday - timedelta(days=7)).isoformat(),
         next_week=(monday + timedelta(days=7)).isoformat(),
         is_current_week=monday == weeks.current_monday(),
-        proposed=proposed,
-        undecided=undecided,
-        never=never,
+        items=items,
         staples=staples,
-        has_anything=bool(proposed or undecided or never or staples),
-    )
-
-
-@bp.get("/groceries/picnic/choose/<int:ingredient_id>")
-def choose(ingredient_id):
-    """Alternatives for one ingredient. The only page that calls search()."""
-    ingredient = queries.get_ingredient(ingredient_id)
-    if ingredient is None:
-        flash("No such ingredient.", "error")
-        return redirect(url_for("picnic.show"))
-
-    monday = weeks.parse_monday(request.args.get("week"))
-    line = next(
-        (l for l in _week_lines(monday) if l.ingredient_id == ingredient_id), None
-    )
-
-    hits, error = [], None
-    try:
-        hits = picnic.search(picnic.client(), request.args.get("q") or ingredient["name"])
-    except picnic.PicnicUnavailable as exc:
-        error = str(exc)
-
-    return render_template(
-        "picnic_choose.html",
-        ingredient=ingredient,
-        line=line,
-        monday=monday,
+        has_anything=bool(items or staples),
+        open_id=open_id,
+        query=query,
         hits=hits,
         error=error,
-        query=request.args.get("q") or ingredient["name"],
-        current=queries.picnic_mappings([ingredient_id]).get(ingredient_id),
         units=sorted({unit for unit in picnic.UNITS if picnic.UNITS[unit][0] != "vague"}),
     )
 
@@ -127,7 +117,7 @@ def choose(ingredient_id):
 @bp.post("/groceries/picnic/choose/<int:ingredient_id>")
 def confirm(ingredient_id):
     monday = weeks.parse_monday(request.form.get("week"))
-    back = url_for("picnic.show", week=monday.isoformat())
+    back = url_for("picnic.show", week=monday.isoformat()) + f"#row-{ingredient_id}"
 
     if request.form.get("action") == "never":
         queries.set_picnic_never(ingredient_id)
@@ -150,8 +140,9 @@ def confirm(ingredient_id):
     # forever rather than once. Refuse it here instead of storing it.
     if not product_id or quantity <= 0 or unit not in picnic.UNITS:
         flash("Pick a product and say how much one pack covers.", "error")
-        return redirect(url_for("picnic.choose", ingredient_id=ingredient_id,
-                                week=monday.isoformat()))
+        reopen = url_for("picnic.show", week=monday.isoformat(),
+                         open=ingredient_id) + f"#row-{ingredient_id}"
+        return redirect(reopen)
 
     queries.set_picnic_mapping(
         ingredient_id,
@@ -176,8 +167,8 @@ def push():
         flash("Nothing ticked.", "error")
         return redirect(back)
 
-    proposed, _, _, staples = _plan(_week_lines(monday))
-    by_id = {str(item["line"].ingredient_id): item for item in proposed + staples}
+    items, staples = _plan(_week_lines(monday))
+    by_id = {str(item["line"].ingredient_id): item for item in items + staples}
 
     try:
         api = picnic.client()
