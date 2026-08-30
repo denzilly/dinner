@@ -831,6 +831,10 @@ h2 {
 
 input, textarea, select {
   font: inherit;
+  /* <select> ignores an inherited line-height and falls back to "normal",
+     which renders a few px shorter than a same-padding text input. Pin it
+     so a <select> next to an <input> lines up exactly. */
+  line-height: 1.5;
   color: var(--text);
   background: var(--surface);
   border: 1px solid var(--border);
@@ -846,7 +850,17 @@ input:focus, textarea:focus, select:focus {
 
 textarea { width: 100%; resize: vertical; }
 
-.input-tiny { width: 4.5rem; }
+.input-tiny { width: 4.5rem; text-align: center; }
+
+/* The browser's stepper arrows look clunky at this size -- drop them and
+   keep the up/down arrow keys, which still work without them. */
+.input-tiny[type="number"] { appearance: textfield; -moz-appearance: textfield; }
+
+.input-tiny[type="number"]::-webkit-outer-spin-button,
+.input-tiny[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
 
 button { cursor: pointer; }
 
@@ -1008,81 +1022,97 @@ button { cursor: pointer; }
   border: 0;
 }
 
-/* Filter dropdown ---------------------------------------------------------
-   The design's row is search + sort + one Filter button, so the tag bank and
-   the time limit hang off that button instead of sitting in the row. */
+/* Second row: tag search + cooking-time filter -----------------------------
+   A smaller search box narrows the tag bank as you type; the minutes field
+   sits to its right and submits itself since there's no popover Apply
+   button here to lean on. */
 
-.filter-menu { position: relative; flex: none; }
+.filters__row--secondary { gap: 0.75rem; justify-content: space-between; }
 
-.filter-menu > summary {
-  list-style: none;
-  user-select: none;
+/* Capped at half the row instead of flex:1, so the cooking-time filter
+   doesn't get pushed all the way to the far edge by a wide search box --
+   space-between above puts whatever room is left between the two. */
+.tag-search { position: relative; flex: 1; min-width: 12rem; max-width: 50%; display: flex; }
+
+.tag-search .icon {
+  position: absolute;
+  left: 0.85rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--outline);
+  pointer-events: none;
 }
 
-.filter-menu > summary::-webkit-details-marker { display: none; }
-
-.filter-menu > summary.is-on {
-  border-color: var(--secondary);
-  background: var(--accent-soft);
-  color: var(--on-accent-soft);
+.tag-search__input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.45rem 0.75rem 0.45rem 2.5rem;
+  font-size: 0.88rem;
 }
 
-.filter-menu__count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 1.1rem;
-  height: 1.1rem;
-  padding: 0 0.25rem;
-  border-radius: 999px;
-  background: var(--accent);
-  color: var(--surface);
-  font-size: 11px;
-  letter-spacing: 0;
-}
-
-.filter-menu__panel {
+.tag-search__menu {
   position: absolute;
   z-index: 30;
-  top: calc(100% + 0.5rem);
-  right: 0;
-  width: min(22rem, calc(100vw - 3rem));
+  top: calc(100% + 0.4rem);
+  left: 0;
+  width: min(20rem, calc(100vw - 3rem));
+  max-height: 16rem;
+  overflow-y: auto;
   display: grid;
-  gap: 0.9rem;
-  padding: 1rem;
+  align-content: start;
+  gap: 0.15rem;
+  padding: 0.5rem;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: 0 12px 32px rgba(45, 79, 60, 0.14);
 }
 
-/* A popover anchored to the button is wider than a phone, so below this width
-   the panel drops inline and pushes the list down instead. */
-@media (max-width: 640px) {
-  .filter-menu { flex: 1 1 100%; }
-  .filter-menu > summary { width: 100%; justify-content: center; }
-  .filter-menu__panel {
-    position: static;
-    width: auto;
-    margin-top: 0.5rem;
-    box-shadow: none;
-  }
+/* An author `display` rule beats the UA stylesheet's [hidden], so it needs
+   its own override or the menu never actually hides. */
+.tag-search__menu[hidden] { display: none; }
+
+.tag-search__option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: calc(var(--radius) - 4px);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 0.88rem;
 }
 
-.filter-menu__time {
+.tag-search__option:hover { background: var(--accent-soft); color: var(--on-accent-soft); }
+
+.tag-search__option[hidden] { display: none; }
+
+.tag-search__kind {
+  color: var(--muted);
+  font-family: var(--font-label);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.tag-search__empty { margin: 0.2rem 0.4rem; color: var(--muted); font-size: 0.85rem; }
+
+.time-filter {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.4rem;
+  flex: none;
   font-size: 0.9rem;
   color: var(--muted);
 }
 
-.filter-menu__group { display: grid; gap: 0.4rem; }
-
-.filter-menu__empty { margin: 0; color: var(--muted); font-size: 0.85rem; }
-
-.filter-menu__panel .button { justify-self: start; }
+@media (max-width: 640px) {
+  .filters__row--secondary { flex-direction: column; align-items: stretch; }
+  .tag-search { max-width: none; }
+  .tag-search__menu { width: auto; }
+}
 
 /* Active filter chips ------------------------------------------------------ */
 
@@ -1126,6 +1156,13 @@ button { cursor: pointer; }
   flex: 1;
   min-width: 0;
   padding-left: 3rem;
+}
+
+/* A native <select> box ignores line-height in some browsers and renders a
+   few px shorter than a text input with the same padding, so pin both to
+   the same explicit height rather than trusting them to agree on their own. */
+.search-field input[type="search"], .filters__row select {
+  height: calc(1.5rem + 2 * 0.65rem + 2px);
 }
 
 .filters__row select { min-width: 13rem; flex: none; cursor: pointer; }

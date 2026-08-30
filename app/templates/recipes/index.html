@@ -15,8 +15,8 @@
 </div>
 
 <form class="filters" method="get" action="{{ url_for('recipes.index') }}">
-  {# Enter in the search box needs a submit button that is always rendered --
-     the Apply button lives inside a closed <details> and cannot be relied on. #}
+  {# Enter in the search box needs a submit button that is always rendered,
+     since the minutes field is the only other thing in this form that submits. #}
   <button type="submit" class="visually-hidden" tabindex="-1">Search</button>
 
   <div class="filters__row">
@@ -32,45 +32,48 @@
       <option value="unused" {{ 'selected' if sort == 'unused' }}>Sort: least recently cooked</option>
       <option value="time" {{ 'selected' if sort == 'time' }}>Sort: quickest first</option>
     </select>
+  </div>
 
-    {# The design shows a single Filter button rather than the whole tag bank,
-       so time and tags live in a dropdown and the resting row stays clean. #}
-    <details class="filter-menu">
-      <summary class="button {{ 'is-on' if active_tags or max_minutes }}">
-        {{ icon('tune') }} Filter
-        {% if active_tags or max_minutes %}
-          <span class="filter-menu__count">{{ active_tags|length + (1 if max_minutes else 0) }}</span>
-        {% endif %}
-      </summary>
-      <div class="filter-menu__panel">
-        <label class="filter-menu__time">
-          Ready in under
-          <input type="number" name="max_minutes" min="5" step="5"
-                 value="{{ max_minutes or '' }}" class="input-tiny"> minutes
-        </label>
-
+  {# Second row: a small tag search that adds one tag at a time (already-active
+     tags drop out of the results and appear in the Active row below instead),
+     plus the cooking-time filter alongside it. #}
+  <div class="filters__row filters__row--secondary">
+    <div class="tag-search" data-tag-search>
+      {{ icon('search', 18) }}
+      <input type="text" class="tag-search__input" placeholder="Search tags to add…"
+             autocomplete="off" aria-label="Search tags to add">
+      <div class="tag-search__menu" hidden>
+        {% set ns = namespace(count=0) %}
         {% for kind, tags in tags_by_kind.items() %}
-          <div class="filter-menu__group">
-            <span class="filters__kind">{{ kind }}</span>
-            <div class="filters__tags">
-              {% for tag in tags %}
-                <label class="chip {{ 'chip--on' if tag.id in active_tags }}">
-                  <input type="checkbox" name="tag" value="{{ tag.id }}"
-                         {{ 'checked' if tag.id in active_tags }}>
-                  {{ tag.name }} <span class="chip__count">{{ tag.uses }}</span>
-                </label>
-              {% endfor %}
-            </div>
-          </div>
-        {% else %}
-          <p class="filter-menu__empty">
-            No tags yet — they are added when you accept a recipe for the bank.
-          </p>
+          {% for tag in tags if tag.id not in active_tags %}
+            {% set ns.count = ns.count + 1 %}
+            <a class="tag-search__option" data-tag-name="{{ tag.name|lower }}"
+               href="{{ url_for('recipes.index', q=query or None, sort=sort,
+                                max_minutes=max_minutes or None,
+                                tag=active_tags + [tag.id]) }}">
+              {{ tag.name }} <span class="tag-search__kind">{{ kind }}</span>
+            </a>
+          {% endfor %}
         {% endfor %}
-
-        <button type="submit" class="button button--primary">Apply filters</button>
+        {% if ns.count == 0 %}
+          <p class="tag-search__empty">
+            {% if tags_by_kind %}
+              All tags are already applied.
+            {% else %}
+              No tags yet — they are added when you accept a recipe for the bank.
+            {% endif %}
+          </p>
+        {% endif %}
+        <p class="tag-search__empty tag-search__empty--no-match" hidden>No matching tags.</p>
       </div>
-    </details>
+    </div>
+
+    <label class="time-filter">
+      {{ icon('schedule', 18) }}
+      Ready in under
+      <input type="number" name="max_minutes" min="5" step="5"
+             value="{{ max_minutes or '' }}" class="input-tiny" data-auto-submit> minutes
+    </label>
   </div>
 
   {% if active_tag_rows or max_minutes or query %}
@@ -148,4 +151,6 @@
     {% endfor %}
   </ul>
 {% endif %}
+
+<script src="{{ url_for('static', filename='js/recipes.js') }}" defer></script>
 {% endblock %}
