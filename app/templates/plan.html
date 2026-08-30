@@ -3,6 +3,12 @@
 
 {% block title %}Week of {{ monday.strftime('%d %B %Y') }} — Dinner{% endblock %}
 {% block body_class %}page-plan{% endblock %}
+{% block flashes %}
+  {#- The week board doesn't show a flash bar. Still drain the queue so a
+      message from a plan action doesn't leak onto the next page that does
+      render one (e.g. Recipes) after navigating away. -#}
+  {% set _ = get_flashed_messages(with_categories=true) %}
+{% endblock %}
 
 {% block content %}
 <div class="week-nav">

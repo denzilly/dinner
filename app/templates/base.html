@@ -38,11 +38,13 @@
   </header>
 
   <main>
+    {% block flashes %}
     <div id="flashes">
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% include "_flashes.html" %}
       {% endwith %}
     </div>
+    {% endblock %}
     {% block content %}{% endblock %}
   </main>
 </body>
